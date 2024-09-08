@@ -10,7 +10,7 @@ a02AA = .529177249 # AA / a0
 
 # use these values:
 omega = 3000
-xi = 0.002
+xi = 0.02
 D = omega/(4*xi)
 mred = 1
 mredau = mred*amu
@@ -30,12 +30,12 @@ print(f"  -->     D={D} cm-1   a={a} AA^-1")
 
 re = 2.  # has no effect
 
-m_system = FcfUtils.FcfMorse0(Dau,aau,mredau,dltau,True)
+m_system = FcfUtils.FcfMorse0(Dau,aau,mredau,dltau)
 
 print(f"max. quanta: {m_system.max_n()}")
 
 
-max_n = 1 #m_system.max_n()
+max_n = m_system.max_n()
 
 print(max_n)
 
