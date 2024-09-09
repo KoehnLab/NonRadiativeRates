@@ -308,9 +308,10 @@ class FCWD:
                     jjmin = kk
                     scr[kk] = fcwd[ii-mult[kk]]
 
-                fcwdn[ii] = 0.
-                for jj in range(jjmin,jjmax+1):
-                    fcwdn[ii] += scr[jj]*values[jj]
+                fcwdn[ii] = np.dot(scr[jjmin:jjmax+1],values[jjmin:jjmax+1])
+                #fcwdn[ii] = 0.
+                #for jj in range(jjmin,jjmax+1):
+                #    fcwdn[ii] += scr[jj]*values[jj]
 
             fcwd = fcwdn
 

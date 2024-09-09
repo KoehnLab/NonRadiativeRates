@@ -14,6 +14,7 @@ amu = 1./5.485799090441e-4 # me
 def run_simulation(
         hessian_calculation="testmolecule",
         egrad_calculation="testmolecule",
+        fcwd_file="fcwd.dat",
         D = 30000,                  # diss. energy (for estimate of anharm.)
         e_trans = 15000,            # energy where FCWD is measured
         sigma = 100.,               # width of Gaussian energy window centered at e_trans
@@ -166,17 +167,17 @@ def run_simulation(
     print("sum(fwin):",np.sum(fwin))
     print("fwin(last)=",fwin[-1])
 
-    ii = -1
-    for val,vala in zip(fcwd,fcwd_a):
-        ii = ii+1
-        en = ii*1.  
-        if en < max_e:
-            print(f" {en:10.2f} {val:20.6e} {vala:20.6e}")
+    with open(fcwd_file,"w") as outstr:
+        ii = -1
+        for val,vala in zip(fcwd,fcwd_a):
+            ii = ii+1
+            en = ii*1.  
+            print(f" {en:10.2f} {val:20.6e} {vala:20.6e}",file=outstr)
 
     val_avg = np.sum(fcwd*fwin)
     vala_avg = np.sum(fcwd_a*fwin)
 
-    print(f"Averages: {val_avg} {vala_avg}")
+    print(f"Averages: {val_avg} {vala_avg}",flush=True)
 
     nmodes = len(mode_fcf_list)
     for mode_idx in range(nmodes-1,-1,-1):
@@ -198,7 +199,7 @@ def run_simulation(
         val_avg_s = np.sum(fcwd*fwin)
         vala_avg_s = np.sum(fcwd_a*fwin)
 
-        print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ")
+        print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ",flush=True)
 
 
 def main():
