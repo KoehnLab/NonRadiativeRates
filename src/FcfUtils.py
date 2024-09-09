@@ -260,7 +260,7 @@ class FCWD:
         self.mode_list = mode_list
 
 
-    def get_FCWD(self,nu_max,dnu):
+    def get_FCWDori(self,nu_max,dnu):
         """
         compute the FCWD on a grid
         the algorithm goes back to Stein and Rabinowicz (citation to be found)
@@ -296,7 +296,7 @@ class FCWD:
                 scr[0:nmult] = 0.
                 kk = nmult
                 jjmin = 0
-                jjmax = 0
+                jjmax = nmult-1 #0
                 for jj in range(nmult):
                     kk -= 1
 
@@ -317,3 +317,60 @@ class FCWD:
 
         return fcwd
     
+    def get_FCWD(self,nu_max,dnu):
+        """
+        compute the FCWD on a grid
+        the algorithm goes back to Stein and Rabinowicz (citation to be found)
+        and a suggestion by Robert Send (PhD thesis, Karlsruhe 2010)
+        slightly improved version (still slow)
+        """
+
+        nbins = int(np.ceil(nu_max/dnu))
+
+        fcwd = np.zeros((nbins))
+        fcwd[0] = 1.
+
+        # loop over modes
+        for fcf_list in self.mode_list:
+
+            # put integrals on sparse list according to graining
+            values = []
+            mult = []
+            multscr = []
+
+            for fcf in fcf_list:
+                values.append(fcf[0])
+                mult.append(int(np.floor(fcf[1]/dnu)))
+                multscr.append(0)
+                # may add screening here
+                # should check that values on mult are not identical (too large grid)
+
+            nmult = len(mult)
+
+            mult = np.array(mult)
+            multscr = np.array(multscr)
+
+            scr   = np.zeros((nmult))
+            fcwdn = np.zeros((nbins))
+
+            jjmax=0
+            # multiply the values on the sparse list onto the current FCWD
+            for ii in range(nbins):
+
+                kk = jjmax
+                for jj in range(jjmax+1,nmult):
+                    if mult[jj] <= ii:
+                        kk+=1
+                    else:
+                        break
+                jjmax = kk
+
+                multscr = -mult
+                multscr += ii
+                scr = fcwd[multscr[0:jjmax+1]]
+
+                fcwdn[ii] = np.dot(scr[0:jjmax+1],values[0:jjmax+1])
+
+            fcwd = fcwdn
+
+        return fcwd

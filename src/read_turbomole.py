@@ -100,6 +100,26 @@ class turbomole_results:
             masses = self.masses
 
         return masses
+    
+
+    def get_sqrtMvector(self,flat=False):
+
+        if self.coords is None:
+            self.get_coords()
+
+        if self.masses is None:
+            self.get_masses()
+
+        sqrtMvec = []
+        for idx in range(self.nAtoms):
+            sqrtM = np.sqrt(self.masses[idx])
+            sqrtMvec.append([sqrtM,sqrtM,sqrtM])
+
+        if flat:
+            sqrtMvec = np.reshape(sqrtMvec,(3*self.nAtoms))
+
+        return sqrtMvec
+
 
     def get_hessian(self):
 
@@ -196,7 +216,7 @@ class turbomole_results:
 
         return frequencies, Lmat, redmass
 
-    def get_gradient(self,index=-1):
+    def get_gradient(self,index=-1,flat=False):
 
         ext_file = self.file_for_datagroup("grad")
 
@@ -263,5 +283,45 @@ class turbomole_results:
             grad = grad_read[-1]
             coord = coord_read[-1]
 
+        if flat:
+            grad = np.reshape(grad,(3*self.nAtoms))
+            coord = np.reshape(coord,(3*self.nAtoms))
+
         return grad,coord
+
+
+    def get_couplingvector(self,flat=False):
+
+        if self.coords is None:
+            self.get_coords()
+
+        ext_file = self.file_for_datagroup("couplingvector")
+
+        with open(os.path.join(self.turbomole_path,ext_file), "r") as instr:
+            data = instr.readlines()
+            in_data_group = False
+            cvect = []
+            count = 0
+            for line in data:
+                if "$couplingvector" in line:
+                    in_data_group = True
+                    continue
+                if in_data_group:
+                    if line[0] == "#":
+                        continue
+                    if line[0] == "$":
+                        in_data_group = False
+                        continue
+                    line = line.replace("D","e")
+                    col = line.split()
+                    count +=1
+                    cvect.append([float(col[0]),float(col[1]),float(col[2])])
+            
+            if count != self.nAtoms:
+                raise RuntimeError(f"coupling vectors does not match nAtoms: {count} {self.nAtoms}")
+
+        if flat:
+            cvect = np.reshape(cvect,(3*self.nAtoms))
+
+        return(cvect)
     
