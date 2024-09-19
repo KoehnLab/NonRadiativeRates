@@ -3,6 +3,9 @@ import scipy.special as scsp
 import fastfold
 
 
+use_cython = True   # you have to compile fastfold
+
+
 class FcfMorse0:
     """
     this class stores the info needed for computing the Franck-Condon factors of
@@ -334,9 +337,8 @@ class FCWD:
         # loop over modes
         for fcf_list in self.mode_list:
 
-            use_cython = False
             if use_cython:
-                fcwd = fastfold.fold(fcwd,fcf_list)
+                fcwd = fastfold.fold(fcwd,fcf_list,dnu)
 
             else:
                 # put integrals on sparse list according to graining
