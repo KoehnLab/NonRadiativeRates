@@ -1,5 +1,9 @@
 import numpy as np
 import scipy.special as scsp
+import fastfold
+
+
+use_cython = True   # you have to compile fastfold
 
 
 class FcfMorse0:
@@ -333,44 +337,48 @@ class FCWD:
         # loop over modes
         for fcf_list in self.mode_list:
 
-            # put integrals on sparse list according to graining
-            values = []
-            mult = []
-            multscr = []
+            if use_cython:
+                fcwd = fastfold.fold(fcwd,fcf_list,dnu)
 
-            for fcf in fcf_list:
-                values.append(fcf[0])
-                mult.append(int(np.floor(fcf[1]/dnu)))
-                multscr.append(0)
-                # may add screening here
-                # should check that values on mult are not identical (too large grid)
+            else:
+                # put integrals on sparse list according to graining
+                values = []
+                mult = []
+                multscr = []
 
-            nmult = len(mult)
+                for fcf in fcf_list:
+                    values.append(fcf[0])
+                    mult.append(int(np.floor(fcf[1]/dnu)))
+                    multscr.append(0)
+                    # may add screening here
+                    # should check that values on mult are not identical (too large grid)
 
-            mult = np.array(mult)
-            multscr = np.array(multscr)
+                nmult = len(mult)
 
-            scr   = np.zeros((nmult))
-            fcwdn = np.zeros((nbins))
+                mult = np.array(mult)
+                multscr = np.array(multscr)
 
-            jjmax=0
-            # multiply the values on the sparse list onto the current FCWD
-            for ii in range(nbins):
+                scr   = np.zeros((nmult))
+                fcwdn = np.zeros((nbins))
 
-                kk = jjmax
-                for jj in range(jjmax+1,nmult):
-                    if mult[jj] <= ii:
-                        kk+=1
-                    else:
-                        break
-                jjmax = kk
+                jjmax=0
+                # multiply the values on the sparse list onto the current FCWD
+                for ii in range(nbins):
 
-                multscr = -mult
-                multscr += ii
-                scr = fcwd[multscr[0:jjmax+1]]
+                    kk = jjmax
+                    for jj in range(jjmax+1,nmult):
+                        if mult[jj] <= ii:
+                            kk+=1
+                        else:
+                            break
+                    jjmax = kk
 
-                fcwdn[ii] = np.dot(scr[0:jjmax+1],values[0:jjmax+1])
+                    multscr = -mult
+                    multscr += ii
+                    scr = fcwd[multscr[0:jjmax+1]]
 
-            fcwd = fcwdn
+                    fcwdn[ii] = np.dot(scr[0:jjmax+1],values[0:jjmax+1])
+
+                fcwd = fcwdn
 
         return fcwd
