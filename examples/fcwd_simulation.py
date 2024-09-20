@@ -14,7 +14,7 @@ amu = 1./5.485799090441e-4 # me
 def run_simulation(
         hessian_calculation="testmolecule",
         egrad_calculation="testmolecule",
-        fcwd_file="fcwd.dat",
+        fcwd_file="fcwd.dat",       # output file for FCWD
         D = 30000,                  # diss. energy (for estimate of anharm.)
         e_trans = 15000,            # energy where FCWD is measured
         sigma = 100.,               # width of Gaussian energy window centered at e_trans
@@ -36,7 +36,7 @@ def run_simulation(
     else:
         mol_data2 = rtm.turbomole_results(egrad_calculation)
 
-    grad,coord_grad = mol_data.get_gradient()
+    grad,coord_grad = mol_data2.get_gradient()
 
     test = (np.array(coord)-np.array(coord_grad))**2
     rms = np.sum(test)/len(test)
