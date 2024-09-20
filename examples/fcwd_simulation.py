@@ -18,6 +18,8 @@ def run_simulation(
         D = 30000,                  # diss. energy (for estimate of anharm.)
         e_trans = 15000,            # energy where FCWD is measured
         sigma = 100.,               # width of Gaussian energy window centered at e_trans
+        damp = 10.,                 # damping for low-frequency modes
+        damp_thr = 100.,            # threshold for low-frequency modes
         thrmod = 1e-24,             # cutoff threshold for modes
         maxquanta = 200,            # max. quanta (cutoff should lead to smaller value)
         max_e = 18000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
@@ -46,24 +48,28 @@ def run_simulation(
     masses = np.array(masses)
     grad = np.array(grad)
     freqs_sh = np.array(freqs)/au2rcm
-
+    freqs0_sh = np.array(freqs)/au2rcm
+     
 
     for ii in range(natoms):
         grad[ii,:] /= np.sqrt(masses[ii]*amu)
 
+    print(f"Use damping of {damp} cm-1 for modes below {damp_thr} cm-1")
+    damp_au = damp/au2rcm
 
     grad = np.reshape(grad,(3*natoms))
 
     for ii in range(natoms):
         if freqs[ii] < 1e-3:
             freqs_sh[ii] = 1e10
-
+        if freqs[ii] < damp_thr:
+            freqs_sh[ii] += damp_au
 
 
     # dsp = - grad/frq^2   (times √frq to get dimensionless coordinates)
     # for emission from state for which we have the gradient information,
     #  we actually have to reverse the sign, so + grad/freq^2 (no issue in harm. approx)
-    dsp = np.sqrt(freqs_sh)*( grad.T @ Lmat ) / freqs_sh**2
+    dsp = np.sqrt(freqs0_sh)*( grad.T @ Lmat ) / (freqs_sh)**2
 
     osci_list = []
     
