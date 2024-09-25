@@ -16,16 +16,28 @@ def run_simulation(
         egrad_calculation="testmolecule",
         fcwd_file="fcwd.dat",       # output file for FCWD
         D = 30000,                  # diss. energy (for estimate of anharm.)
+        anh_thr = 400.,             # use anh. approx for modes larger than this
         e_trans = 15000,            # energy where FCWD is measured
         sigma = 100.,               # width of Gaussian energy window centered at e_trans
         damp = 10.,                 # damping for low-frequency modes
         damp_thr = 100.,            # threshold for low-frequency modes
+        low_freq_approx = 0.,       # classical approx. for modes < this val.
         thrmod = 1e-24,             # cutoff threshold for modes
         maxquanta = 200,            # max. quanta (cutoff should lead to smaller value)
         max_e = 18000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
-        e_bin = 1.                  # binning for FCWD
+        e_bin = 1.,                 # binning for FCWD
+        run_mode_tests = False      # see end of this routine
         ):
 
+
+    print("Entered FCWD simulation\n")
+    print("Settings:")
+    print(f"read Hessian from:  {hessian_calculation}")
+    print(f"read gradient from: {egrad_calculation}")
+    print(f"FCWD written to:    {fcwd_file}")
+    print(f"D = {D}     e_trans = {e_trans}  sigma = {sigma}")
+    print(f"damp = {damp}  damp_thr = {damp_thr}  low_freq_approx = {low_freq_approx}")
+    print(f"thrmod = {thrmod}  maxquanta = {maxquanta}  max_e = {max_e}   e_bin={e_bin}")
 
     mol_data = rtm.turbomole_results(hessian_calculation)
 
@@ -44,6 +56,9 @@ def run_simulation(
     rms = np.sum(test)/len(test)
     print(f"RMSD of coordinates read from coord and gradient: {rms}")
 
+    if rms > 0.01:
+        print("WARNING: RMSD appears to be large! Check inputs!")
+
     # mass weigh the gradient
     masses = np.array(masses)
     grad = np.array(grad)
@@ -53,6 +68,9 @@ def run_simulation(
 
     for ii in range(natoms):
         grad[ii,:] /= np.sqrt(masses[ii]*amu)
+
+    if low_freq_approx > 0:
+        print(f"treating modes below {low_freq_approx} cm-1 classically")
 
     print(f"Use damping of {damp} cm-1 for modes below {damp_thr} cm-1")
     damp_au = damp/au2rcm
@@ -83,6 +101,8 @@ def run_simulation(
 
     Dau = D / au2rcm
 
+    Ereo_class = 0.
+    Ereo_quant = 0.
 
     for osci in osci_list:
 
@@ -94,8 +114,19 @@ def run_simulation(
 
         xi = omg/(4.*D)
 
-        use_anh = "A" if xi>=7e-3 else "H"
-        print(f"omg = {omg:8.2f} cm^-1    S = {S:10.4e}  d = {dsp:8.4f} AA   E_reo = {Ereo:8.2f} cm^-1    xi = {xi:10.4e}  {use_anh}")
+        if omg <= low_freq_approx:
+            treat = "C"
+        elif omg <= anh_thr:
+            treat = "H"
+        else:
+            treat = "A" if xi>=7e-3 else "H"
+        print(f"omg = {omg:8.2f} cm^-1    S = {S:10.4e}  d = {dsp:8.4f} AA   E_reo = {Ereo:8.2f} cm^-1    xi = {xi:10.4e}  {treat}")
+
+        if omg <= low_freq_approx:
+            Ereo_class += Ereo
+            continue
+        else:
+            Ereo_quant += Ereo
 
         fcf_list = []
         for ii in range(maxquanta):
@@ -123,7 +154,7 @@ def run_simulation(
         fcf_a_list = []
         for ii in range(maxquanta):
             # for too small anharmonicity, the Morse integral code fails; use harminonic instead
-            if xi < 7e-3: 
+            if omg <= anh_thr or xi < 7e-3: 
                 fcf = np.exp(-S)*S**ii/scsp.gamma(ii+1)
                 en = omg*(ii)
             else:
@@ -155,18 +186,21 @@ def run_simulation(
                 print(f"{fcf_a_list[idx][1]:10.2f} {fcf_a_list[idx][0]:12.4e} ",end="")
             print("")
 
+    print(f"reorganization energy in classical modes: {Ereo_class}")
+    print(f"reorganization energy in quantum modes:   {Ereo_quant}")
+    print(f"total reorganization energy:              {Ereo_class+Ereo_quant}")
 
-    fcwd_gen = FcfUtils.FCWD(mode_fcf_list)
+    fcwd_gen = FcfUtils.FCWD(mode_fcf_list,Ereo_class,debug=2)
 
-    fcwd = fcwd_gen.get_FCWD(max_e,e_bin)
+    fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
 
-    fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list)
+    fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list,Ereo_class,debug=2)
 
-    fcwd_a = fcwd_gen_a.get_FCWD(max_e,e_bin)
+    fcwd_a,offset = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
-    nbins = int(np.ceil(max_e/e_bin))
+    nbins = len(fcwd_a)
 
-    fval = np.linspace(0.,max_e-e_bin,nbins)
+    fval = np.linspace(offset,max_e-e_bin,nbins)
     fwin = 1./(sigma*np.sqrt(2.*np.pi))*np.exp(-0.5*(((fval-e_trans)/sigma)**2))*e_bin
 
     print("fval: ",fval)
@@ -177,7 +211,7 @@ def run_simulation(
         ii = -1
         for val,vala in zip(fcwd,fcwd_a):
             ii = ii+1
-            en = ii*1.  
+            en = ii*1. + offset 
             print(f" {en:10.2f} {val:20.6e} {vala:20.6e}",file=outstr)
 
     val_avg = np.sum(fcwd*fwin)
@@ -185,31 +219,40 @@ def run_simulation(
 
     print(f"Averages: {val_avg} {vala_avg}",flush=True)
 
-    nmodes = len(mode_fcf_list)
-    for mode_idx in range(nmodes-1,-1,-1):
-        mode_fcf_list_sel = []
-        mode_fcf_a_list_sel = []
-        for idx in range(nmodes):
-            if idx == mode_idx:
-                continue
-            mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
-            mode_fcf_list_sel.append(mode_fcf_list[idx])
+    if run_mode_tests:
 
-        print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx][0]}")
-        fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel)
-        fcwd = fcwd_gen.get_FCWD(max_e,e_bin)
+        nmodes = len(mode_fcf_list)
+        for mode_idx in range(nmodes-1,-1,-1):
+            mode_fcf_list_sel = []
+            mode_fcf_a_list_sel = []
+            for idx in range(nmodes):
+                if idx == mode_idx:
+                    continue
+                mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
+                mode_fcf_list_sel.append(mode_fcf_list[idx])
 
-        fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel)
-        fcwd_a = fcwd_gen_a.get_FCWD(max_e,e_bin)
+            print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx][0]}")
+            fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel)
+            fcwd = fcwd_gen.get_FCWD(max_e,e_bin)
 
-        val_avg_s = np.sum(fcwd*fwin)
-        vala_avg_s = np.sum(fcwd_a*fwin)
+            fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel)
+            fcwd_a = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
-        print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ",flush=True)
+            val_avg_s = np.sum(fcwd*fwin)
+            vala_avg_s = np.sum(fcwd_a*fwin)
+
+            print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ",flush=True)
 
 
 def main():
+    # run std
     run_simulation()
+
+    # example modified run
+    #run_simulation(hessian_calculation="TBTM-PCZ-H",
+    #    egrad_calculation="TBTM-PCZ-E",
+    #    fcwd_file="TBTM-PCZ-fcwd-class200-damp100-anh3000.dat",anh_thr=2900,damp_thr=100.,low_freq_approx=200)
+
 
 if __name__ == "__main__":
     main()

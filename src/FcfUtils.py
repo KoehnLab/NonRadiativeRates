@@ -5,6 +5,8 @@ import fastfold
 
 use_cython = True   # you have to compile fastfold
 
+# Boltzmann constant in cm^-1/K
+kBcm = 0.695034800381
 
 class FcfMorse0:
     """
@@ -259,9 +261,25 @@ class FcfMorse0:
     
 class FCWD:
 
-    def __init__(self,mode_list):
+    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0):
 
         self.mode_list = mode_list
+        self.lam_class = lam_class
+        self.T_sim = T_sim
+        self.dbg = debug
+
+
+    def init_Gauss(self,nbins,dnu,nu0,sigma):
+        """
+        compute a Gaussian on a grid, centered at nu0 and width sigma
+        """
+
+        # we assume that bin 1 is zero, so nu0 has to be shifted to match needs
+        xvals = np.linspace(0.,dnu*(nbins-1),nbins)
+
+        gauss = 1./(sigma*np.sqrt(2.*np.pi)) * np.exp(-0.5*((xvals-nu0)/sigma)**2)
+
+        return gauss
 
 
     def get_FCWDori(self,nu_max,dnu):
@@ -271,10 +289,24 @@ class FCWD:
         and a suggestion by Robert Send (PhD thesis, Karlsruhe 2010)
         """
 
-        nbins = int(np.ceil(nu_max/dnu))
+        # broadening by a classical distr.?
+        if self.lam_class > 0.:
+            sigma = np.sqrt(2.*self.lam_class*self.T_sim*kBcm)
+            if self.dbg > 0:
+                print(f"classical distr with sigma = {sigma} cm-1")
+        else:
+            sigma = 0.
+
+        nu_extra = 6*sigma  # at 6 sigma the Gaussian has decayed to <1e-6
+
+        nbins = int(np.ceil((nu_max+nu_extra)/dnu))
 
         fcwd = np.zeros((nbins))
-        fcwd[0] = 1.
+
+        if self.lam_class > 0:
+            fcwd = self.init_Gauss(nbins,dnu,nu_extra+self.lam_class,sigma)
+        else:
+            fcwd[0] = 1.
 
         # loop over modes
         for fcf_list in self.mode_list:
@@ -319,7 +351,7 @@ class FCWD:
 
             fcwd = fcwdn
 
-        return fcwd
+        return fcwd,-nu_extra
     
     def get_FCWD(self,nu_max,dnu):
         """
@@ -329,10 +361,27 @@ class FCWD:
         slightly improved version (still slow)
         """
 
-        nbins = int(np.ceil(nu_max/dnu))
+        # broadening by a classical distr.?
+        if self.lam_class > 0.:
+            sigma = np.sqrt(2.*self.lam_class*self.T_sim*kBcm)
+            if self.dbg > 0:
+                print(f"classical distr with sigma = {sigma} cm-1")
+        else:
+            sigma = 0.
+
+        nu_extra = 6*sigma  # at 6 sigma the Gaussian has decayed to <1e-6
+
+        nbins = int(np.ceil((nu_max+nu_extra)/dnu))
 
         fcwd = np.zeros((nbins))
-        fcwd[0] = 1.
+
+        if self.lam_class > 0:
+            fcwd = self.init_Gauss(nbins,dnu,nu_extra+self.lam_class,sigma)
+            if self.dbg > 0:
+                test = np.sum(fcwd)*dnu
+                print(f"Sum over Gaussian: {test}   first value: {fcwd[0]} ")
+        else:
+            fcwd[0] = 1.
 
         # loop over modes
         for fcf_list in self.mode_list:
@@ -381,4 +430,4 @@ class FCWD:
 
                 fcwd = fcwdn
 
-        return fcwd
+        return fcwd,-nu_extra
