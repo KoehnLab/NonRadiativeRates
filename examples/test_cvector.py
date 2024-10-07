@@ -40,6 +40,7 @@ grad_p = grad_w.T @ Lmat
 
 cvect_pf = []
 dsp = []
+
 for cvp,grd,frq in zip(cvect_p,grad_p,freqs):
     if frq < 1.:
         cvpf = 0.
@@ -48,13 +49,13 @@ for cvp,grd,frq in zip(cvect_p,grad_p,freqs):
         frqau = frq/au2rcm
         cvpf = cvp/np.sqrt(frqau)
         dspf = np.sqrt(frqau)*grd / frqau**2
-    cvect_pf.append(cvpf)
+    cvect_pf.append(frq*cvpf)
     dsp.append(dspf)
 
 cvect_pf = np.array(cvect_pf)
 dsp = np.array(dsp)
 
-print(cvect_pf)
+norm = np.linalg.norm(cvect_pf)
 
 osci_list = []
     
@@ -72,4 +73,6 @@ for ii in range(3*natoms):
     D00 = 0.5*(HR**2)*np.exp(-HR)/HR
     D01 = 0.5*(1-HR)**2*np.exp(-HR)
 
-    print(f" {freqs[ii]:8.2f}  {cvect_pf[ii]*1000:12.6f}   {HR:12.6f}  {D00:12.6f}  {D01:12.6f}  ")
+    print(f" {freqs[ii]:8.2f}  {cvect_pf[ii]:12.6f}   {HR:12.6f}  {D00:12.6f}  {D01:12.6f}  ")
+
+print( f"\nNorm of coupling vector: {norm:.2f}\n" )
