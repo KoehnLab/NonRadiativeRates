@@ -253,10 +253,11 @@ def run_simulation(
 
 def non_radiative(nac, fcwd):
     """
-    Computes internal conversion rate constant from provided norm of the NAC vector and the FCWD.
+    Computes internal conversion rate constant from provided norm of the NAC (rcm) vector and the FCWD (1/rcm).
     """
-    nac_si = (nac * 100 * hh * cc) / a0
-    knr = (np.pi/hbar) * nac_si**2 * fcwd
+    fcwd_si = fcwd / (100 * hh * cc)
+    nac_si = (nac * 100 * hh * cc)
+    knr = (np.pi/hbar) * nac_si**2 * fcwd_si
 
     return knr
 
