@@ -14,25 +14,31 @@ cc = 299792458
 hh = 6.62607015e-34
 
 # Specify directories:
-hessian_dir = "/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/optimization/rsh_optimization_0.190_0.460_0.211/jobex/aoforce"
-egrad_dir = "/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/excited_state_1/rsh_state_1_egrad_0.190_0.460_0.211/ridft/egrad"
+gamma = 0.211
+hessian_dir = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/optimization/rsh_optimization_0.190_0.460_{gamma:.3f}/jobex/aoforce"
+egrad_dir = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/excited_state_1/rsh_state_1_egrad_0.190_0.460_{gamma:.3f}/ridft/egrad"
+nac_dir = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/excited_state_1_exeq_1/rsh_state_1_exeq_1_egrad_0.190_0.460_{gamma:.3f}/ridft/egrad"
+
+# Specify excitation and reorganization energy:
+vexc = 1.6615e+4
+reo = 1479.72
 
 def run_simulation(
         hessian_calculation=hessian_dir,
         egrad_calculation=egrad_dir,
-        fcwd_file="fcwd.dat",       # output file for FCWD
+        fcwd_file="FCWD.dat",       # output file for FCWD
         D = 30000,                  # diss. energy (for estimate of anharm.)
         anh_thr = 400.,             # use anh. approx for modes larger than this
-        e_trans = 15000,            # energy where FCWD is measured
+        e_trans = vexc-reo,         # energy where FCWD is measured
         sigma = 100.,               # width of Gaussian energy window centered at e_trans
         damp = 10.,                 # damping for low-frequency modes
         damp_thr = 100.,            # threshold for low-frequency modes
-        low_freq_approx = 0.,       # classical approx. for modes < this val.
+        low_freq_approx = 300.,     # classical approx. for modes < this val.
         thrmod = 1e-24,             # cutoff threshold for modes
         maxquanta = 200,            # max. quanta (cutoff should lead to smaller value)
-        max_e = 18000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
+        max_e = 25000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
         e_bin = 1.,                 # binning for FCWD
-        run_mode_tests = False      # see end of this routine
+        run_mode_tests = True       # see end of this routine
         ):
 
 
@@ -149,6 +155,7 @@ def run_simulation(
                     break
 
         mode_fcf_list.append(fcf_list)
+        print(f"{osci_list.index(osci)} {fcf_list}")
 
         mred = osci[3]
         aau = np.sqrt(2.*omg/au2rcm*xi*mred*amu)
@@ -215,6 +222,7 @@ def run_simulation(
 
     with open(fcwd_file,"w") as outstr:
         ii = -1
+        print(f"{'FREQ':>10} {'FCWDh':>20} {'FCWDa':>20}",file=outstr)
         for val,vala in zip(fcwd,fcwd_a):
             ii = ii+1
             en = ii*1. + offset 
@@ -227,29 +235,57 @@ def run_simulation(
 
     if run_mode_tests:
 
+    # Exclude individual modes
         nmodes = len(mode_fcf_list)
-        for mode_idx in range(nmodes-1,-1,-1):
-            mode_fcf_list_sel = []
-            mode_fcf_a_list_sel = []
-            for idx in range(nmodes):
-                if idx == mode_idx:
-                    continue
-                mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
-                mode_fcf_list_sel.append(mode_fcf_list[idx])
+        nclass = len(osci_list) - len(mode_fcf_list)
+        with open("FCWD_contr.dat", "w") as outf:
+            print(f"{'FREQ':>16} {'FCWDh':>16} {'FCWDh rel':>16}  {'FCWDa':>16} {'FCWDa rel':>16}",file=outf)
+            for mode_idx in range(nmodes-1,-1,-1):
+                mode_fcf_list_sel = []
+                mode_fcf_a_list_sel = []
+                for idx in range(nmodes):
+                    if idx == mode_idx:
+                        continue
+                    mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
+                    mode_fcf_list_sel.append(mode_fcf_list[idx])
+    
+                print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx+nclass][0]}")
+                fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=2)
+                fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
+    
+                fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel,Ereo_class,debug=2)
+                fcwd_a,offset = fcwd_gen_a.get_FCWD(max_e,e_bin)
+    
+                val_avg_s = np.sum(fcwd*fwin)
+                vala_avg_s = np.sum(fcwd_a*fwin)
+    
+                print(f"{osci_list[mode_idx+nclass][0]:>16.2f} {val_avg_s:>16.5e} {val_avg/val_avg_s:>16.6f}  {vala_avg_s:>16.5e} {vala_avg/vala_avg_s:>16.6f} ",flush=True)
+                print(f"{osci_list[mode_idx+nclass][0]:>16.2f} {val_avg_s:>16.5e} {val_avg/val_avg_s:>16.6f}  {vala_avg_s:>16.5e} {vala_avg/vala_avg_s:>16.6f} ",file=outf)
+    
 
-            print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx][0]}")
-            fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel)
-            fcwd = fcwd_gen.get_FCWD(max_e,e_bin)
+    # Exclude selected groups of modes:
+    freq_sel = [frq for frq in freqs if frq > 3000.]
+    mode_fcf_list_sel = []
+    mode_fcf_a_list_sel = []
+    for idx in range(len(mode_fcf_list)):
+        if freqs[idx] in freq_sel:
+            mode_fcf_list_sel.append(mode_fcf_list[idx])
+            mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
+        else:
+            continue
+    print(f"\nOmmiting modes with frequencies > 3000. rcm")
+    fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=2)
+    fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
 
-            fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel)
-            fcwd_a = fcwd_gen_a.get_FCWD(max_e,e_bin)
+    fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel,Ereo_class,debug=2)
+    fcwd_a,offset = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
-            val_avg_s = np.sum(fcwd*fwin)
-            vala_avg_s = np.sum(fcwd_a*fwin)
+    val_avg_s = np.sum(fcwd*fwin)
+    vala_avg_s = np.sum(fcwd_a*fwin)
 
-            print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ",flush=True)
+    print(f"Averages: {val_avg_s:16.5e} (H)    {vala_avg_s:16.5e} (A) ",flush=True)
 
-    return val_avg, vala_avg
+    return val_avg, vala_avg, osci_list, fcf_list, fcf_a_list
 
 def non_radiative(nac, fcwd):
     """
@@ -264,11 +300,11 @@ def non_radiative(nac, fcwd):
 
 
 def main():
-    fcwd, fcwd_a = run_simulation()
+    fcwd, fcwd_a, osci_list, fcf_list, fcf_a_list = run_simulation()
 
-    egrad_dat = rtm.turbomole_results(egrad_dir)
-    nacv = egrad_dat.get_couplingvector(True)
-    Mvect = egrad_dat.get_sqrtMvector(True)
+    nac_dat = rtm.turbomole_results(nac_dir)
+    nacv = nac_dat.get_couplingvector(True)
+    Mvect = nac_dat.get_sqrtMvector(True)
 
     hessian_dat = rtm.turbomole_results(hessian_dir)
     freqs, Lmat, redmass = hessian_dat.get_hessian()
@@ -294,6 +330,12 @@ def main():
     knr = non_radiative(nac, fcwd)
     knr_a = non_radiative(nac, fcwd_a)
     print(f"\nNon-radiative rates:\n{knr:.3e} (H)   {knr_a:.3e} (A)\n")
+
+    # Writes output to file:
+    with open(f"TTM-1Cz_{gamma}.dat", "w") as _f:
+        _f.write(f"{'FREQ':>20} {'HR':>20} {'NAC':>20}\n")
+        for osci,nac in zip(osci_list, nacv_pf[7:]):
+            _f.write(f"{osci[0]:>20.2f} {osci[1]:>20.4e} {nac:>20.2f}\n")
     
 
 
