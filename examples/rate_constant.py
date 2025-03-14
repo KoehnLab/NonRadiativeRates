@@ -264,16 +264,17 @@ def run_simulation(
     
 
     # Exclude selected groups of modes:
-    freq_sel = [frq for frq in freqs if frq > 3000.]
+    nmodes = len(mode_fcf_list)
+    nclass = len(osci_list) - len(mode_fcf_list)
     mode_fcf_list_sel = []
     mode_fcf_a_list_sel = []
-    for idx in range(len(mode_fcf_list)):
-        if freqs[idx] in freq_sel:
+    for idx in range(nmodes):
+        if osci_list[idx+nclass][0] < 3000.:
             mode_fcf_list_sel.append(mode_fcf_list[idx])
             mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
         else:
             continue
-    print(f"\nOmmiting modes with frequencies > 3000. rcm")
+    print(f"\nOmitting modes with frequencies > 3000. rcm")
     fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=2)
     fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
 
