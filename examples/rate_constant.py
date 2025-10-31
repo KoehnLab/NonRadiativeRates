@@ -5,6 +5,7 @@ import scipy.special as scsp
 
 import FcfUtils
 import read_turbomole as rtm
+from mode_direction import get_Lmat
 
 au2rcm = 219474.63068  # cm-1 / E_h
 amu = 1./5.485799090441e-4 # me
@@ -38,7 +39,7 @@ def run_simulation(
         maxquanta = 200,            # max. quanta (cutoff should lead to smaller value)
         max_e = 25000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
         e_bin = 1.,                 # binning for FCWD
-        run_mode_tests = True       # see end of this routine
+        run_mode_tests = False       # see end of this routine
         ):
 
 
@@ -56,6 +57,7 @@ def run_simulation(
     coord,elems,natoms = mol_data.get_coords()
     masses = mol_data.get_masses()
     freqs,Lmat,redmass = mol_data.get_hessian()
+    Lmat = get_Lmat(hessian_dir)
 
     if hessian_calculation == egrad_calculation:
         mol_data2 = mol_data
