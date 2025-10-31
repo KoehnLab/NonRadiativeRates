@@ -1,3 +1,9 @@
+"""
+written by Andreas Koehn (2024, updated 2025)
+read info from turbomole projects
+- should get a repo of its own
+"""
+
 import os
 
 import numpy as np
@@ -10,6 +16,15 @@ avmasses = {"h":1.008,"he":4.002602,
 "sc":44.955908,"ti":47.867,"v":50.9415,"cr":51.9961,"mn":54.938044,
 "fe":55.845,"co":58.933194,"ni":58.6934,"cu":63.546,"zn":65.38,
 "ga":69.723,"ge":72.630,"as":74.921595,"se":78.971,"br":79.904,"kr":83.798}
+
+atnumbers = {"h":1,"he":2,
+        "li":3,"be":4,"b":5,"c":6,"n":7,"o":8,"f":9,"ne":10,
+        "na":11,"mg":12,"al":13,"si":14,"p":15,"s":16,"cl":17,"ar":18,
+        "k":19,"ca":20,
+        "sc":21,"ti":22,"v":23,"cr":24,"mn":25,
+        "fe":26,"co":27,"ni":28,"cu":29,"zn":30,
+        "ga":31,"ge":32,"as":33,"se":34,"br":35,"kr":36}
+
 
 class turbomole_results:
 
@@ -83,8 +98,10 @@ class turbomole_results:
 
         return coords, symbols, nAtoms
 
+
     def get_avmass(self,element):
         return avmasses[element]
+
 
     def get_masses(self):
 
@@ -100,7 +117,19 @@ class turbomole_results:
             masses = self.masses
 
         return masses
-    
+
+
+    def get_numbers(self):
+        
+        if self.coords is None:
+            self.get_coords()
+
+        numbers = []
+        for element in self.symbols:
+            numbers.append(atnumbers[element])
+
+        return numbers
+
 
     def get_sqrtMvector(self,flat=False):
 
@@ -317,11 +346,12 @@ class turbomole_results:
                     count +=1
                     cvect.append([float(col[0]),float(col[1]),float(col[2])])
             
-            if count != self.nAtoms:
+            if count % self.nAtoms != 0:
                 raise RuntimeError(f"coupling vectors does not match nAtoms: {count} {self.nAtoms}")
 
         if flat:
-            cvect = np.reshape(cvect,(3*self.nAtoms))
+            N = int(count/self.nAtoms)
+            cvect = np.reshape(cvect,(3*N*self.nAtoms))
 
         return(cvect)
     
