@@ -1,0 +1,108 @@
+
+# determines phase for normal coordinates:
+import numpy as np
+from InternalCoord import setup_ics_bonds, compute_jacobian
+import read_turbomole_loc as rtm
+from molmod import *
+import os
+
+# define constants for conversion:
+au2rcm = 219474.63068  # cm-1 / E_h
+amu = 1./5.485799090441e-4 # me
+hbar = 1.054571817e-34
+a0 = 5.29177210544e-11
+cc = 299792458
+hh = 6.62607015e-34
+
+# specifiy range-separation parameter:
+gamma = 0.211
+# directory containing Hessian data:
+hessian = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/optimization/rsh_optimization_0.190_0.460_{gamma:.3f}/jobex/aoforce"
+# directory containing excited state electronic gradient:
+egrad = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/excited_state_1/rsh_state_1_egrad_0.190_0.460_{gamma:.3f}/ridft/egrad"
+hessian, egrad = os.path.abspath(hessian), os.path.abspath(egrad)
+
+# function for constructing B matrix (Jacobian):
+def get_Bmatrix(mol):
+
+    # set the default graph for the construction of the internal coordinates:
+    mol.set_default_graph()
+    # setup a list of internal coordinates:
+    ics = setup_ics_bonds(mol.graph)
+    """
+    print("\n Internal coordinates:")
+    for idx,ic in zip(range(len(ics)),ics):
+        print(f"{idx:6} ",ic)
+    """
+    # compute the Bmatrix for molecule 1; has dimension [natoms,ninternals]:
+    Bmat = compute_jacobian(ics,mol.coordinates)
+
+    return Bmat
+
+# define a norm to distinguish stretching and compression:
+def get_norm(vector):
+    return np.sum(vector)
+
+# define a function to retrieve the phase factors:
+def get_Lmat(hessian):
+    """
+    returns the transformation matrix L with corrected phase factors
+    takes a Molecule object (mol using molmod) and the Turbomole directory with Hessian information (hessian)
+    """
+
+    # parse Hessian data:
+    moldata = rtm.turbomole_results(hessian)
+    coord,symbol,_ = moldata.get_coords()
+    mass = moldata.get_masses()
+    numb = moldata.get_numbers()
+    mol = Molecule(numb,coordinates=np.array(coord),symbols=symbol,masses=mass)
+    
+    masses = moldata.get_masses()
+    freqs,Lmat,redmass = moldata.get_hessian()
+    
+    # construct B matrix:
+    Bmat = get_Bmatrix(mol)
+    
+    # remove mass-weighting:
+    masses_ = []
+    for ms in masses:
+        for idx in range(3):
+            masses_.append(ms)
+    Lmat_rw = np.zeros(np.shape(Lmat))
+    for row_id in range(np.shape(Lmat)[0]):
+        Lmat_rw[row_id,:] = (1./np.sqrt(masses_[row_id])) * Lmat[row_id,:]
+    
+    # apply B matrix:
+    Lmat_rwt = Bmat.T @ Lmat_rw
+    
+    
+    # determine whether a mode stretches or compresses bond lengths:
+    """
+    if a mode is associated with an overall stretching of bond lengths, i.e. the norm is increased, 
+    it is assumed to have a positive phase factor and a negative phase factor otherwise. 
+    modes that essentially do not alter bond legnths are assigned zero as prefactor, see also below.
+    
+    """
+    signs = []
+    for column_id in range(np.shape(Lmat)[1]):
+        mode_internal = Lmat_rwt[:,column_id]
+        mode_norm = get_norm(mode_internal)
+        if mode_norm < 0.:
+            signs.append(-1.)
+        elif mode_norm > 0.:
+            signs.append(1.)
+        # if a mode does not change bond lengths it does not contribute to the displacement (however, typically non-zero):
+        else:
+            signs.append(0.)
+    
+    for idx in range(len(signs)):
+        #print(f"{idx:>5.0f}   {signs[idx]:>5.0f}   {freqs[idx]:>5.0f}")
+        pass
+
+    Lmat_new = np.zeros(np.shape(Lmat))
+    for cidx in range(np.shape(Lmat)[1]):
+        Lmat_new[:,cidx] = signs[cidx] * Lmat[:, cidx]
+        
+    return Lmat_new
+
+#Lmat = get_Lmat(hessian)
