@@ -2,7 +2,7 @@
 # determines phase for normal coordinates:
 import numpy as np
 from InternalCoord import setup_ics_bonds, compute_jacobian
-import read_turbomole_loc as rtm
+import read_turbomole as rtm
 from molmod import *
 import os
 
