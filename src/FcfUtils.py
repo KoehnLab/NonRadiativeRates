@@ -257,6 +257,77 @@ class FcfMorse0:
 
         return In0
 
+def get_b0n(self, nn, h=1e-6):
+        """
+        Get the b_j Franck–Condon related quantity for two equivalent Morse oscillators.
+        Uses numerical derivative dI_n(A,B,C)/dB via four-point central finite differences.
+
+        b_j = (K + ln(2 beta)/alpha) * g_j
+              - (1/alpha^2) * N0 * Nn * Delta^(a0/2) * dI_n/dB
+        """
+
+        if self.dbg:
+            print("calculating b_j for n = ", nn)
+
+        if self.p0 != self.q0:
+            print("This routine is explicitly only for equiv. Morse osc.")
+            raise Exception("not defined")
+
+        # --- notation consistent with get_I0n ---
+        an = 2. * (self.q0 - nn)
+        a0 = 2. * self.p0
+        alpha = self.alpha
+        Delta = np.exp(-alpha * self.dlt)
+
+        if an <= 0:
+            return None
+
+        # normalization constants
+        N0 = np.sqrt(alpha * a0 / scsp.gamma(a0 + 1.))
+        Nn = np.sqrt(alpha * an * scsp.gamma(nn + 1.) / scsp.gamma(an + nn + 1.))
+
+        # hypergeometric parameters
+        A = 0.5 * (Delta + 1.)
+        B = 0.5 * (a0 + an) - 1.
+        C = an
+
+        # --- compute g_j using existing routine ---
+        g_j = self.get_I0n(nn)
+
+        # --- numerical derivative dI_n/dB ---
+        def In_of_B(Bval):
+            Inf1a = scsp.gamma(1. + Bval) / scsp.gamma(nn + 1.)
+            Inf1b = scsp.gamma(C + nn + 1.) / scsp.gamma(C + 1.)
+            Inf1 = Inf1a * Inf1b
+
+            Inf2 = A ** (-1. - Bval)
+            Inf3 = scsp.hyp2f1(1. + Bval, -nn, 1. + C, 1. / A)
+
+            return Inf1 * Inf2 * Inf3
+
+        # --- four-point central difference ---
+        dIn_dB = (
+            -In_of_B(B + 2.0 * h)
+            + 8.0 * In_of_B(B + h)
+            - 8.0 * In_of_B(B - h)
+            + In_of_B(B - 2.0 * h)
+        ) / (12.0 * h)
+
+        # --- physical parameters ---
+        K = self.dlt                         # displacement
+        beta = (1. / alpha) * np.sqrt(2. * self.D1)
+
+        # --- assemble b_j ---
+        bj = ((K + np.log(2. * beta) / alpha) * g_j
+              - (1. / alpha**2)
+              * N0 * Nn * Delta**(0.5 * a0)
+              * dIn_dB)
+
+        if self.dbg:
+            print(f"b_j = {bj}")
+
+        return bj
+
     
     
 class FCWD:
