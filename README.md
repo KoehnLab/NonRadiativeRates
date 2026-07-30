@@ -6,15 +6,11 @@ Add `<where_ever_it_is>/NonRadiativeRates/src` to your `$PYTHONPATH`
 
 # Cython
 
-run:
+run (inside `src`):
 ```
-cython -3 fastfold.pyx
+python setup.py build_ext --inplace
 ```
-to create the fastfold.c source file. Compile this using
-```
-gcc -shared -pthread -fPIC -O2 -Wall -fno-strict-aliasing -I/usr/include/python3.9 -o fastfold.so fastfold.c
-```
-Note: The path to the python include file may be different on other systems.
+(or `python3` if `python` points to a legacy python2 verion). This compiles the cython file `fastfolg.pyx`.
 
 For MAC (in a virtutal environment):
 ```
@@ -25,7 +21,4 @@ pyenv virtualenv 3.9.5 <name>
 pip install -r requirements.txt
 pip install --no-build-isolation molmod 
 ```
-then execute:
-```
-gcc -shared -pthread -fPIC -O2 -Wall -fno-strict-aliasing -I$(python3-config --includes) -undefined dynamic_lookup -o fastfold.so fastfold.c
-```
+then compile the cython file as described above. 
