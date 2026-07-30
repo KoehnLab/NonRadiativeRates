@@ -63,14 +63,13 @@ def get_Lmat(hessian):
     # init geomeTRIC object:
     mol = Molecule()
     mol.elem = [s.capitalize() for s in symbol]
-    mol.xyzs = [coord]
+    mol.xyzs = [np.array(coord)*0.529177249]
     
     masses = moldata.get_masses()
     freqs,Lmat,redmass = moldata.get_hessian()
     
     # construct B matrix:
     Bmat = get_Bmatrix(mol)
-    print(Bmat)
     
     # remove mass-weighting:
     masses_ = []
