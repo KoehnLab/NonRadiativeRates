@@ -1,9 +1,9 @@
 
 # determines phase for normal coordinates:
 import numpy as np
-from InternalCoord import setup_ics_bonds, compute_jacobian
+from geometric.molecule import Molecule
+from geometric.internal import PrimitiveInternalCoordinates, Distance
 import read_turbomole as rtm
-from molmod import *
 import os
 
 # define constants for conversion:
@@ -14,28 +14,33 @@ a0 = 5.29177210544e-11
 cc = 299792458
 hh = 6.62607015e-34
 
-# specifiy range-separation parameter:
-gamma = 0.211
-# directory containing Hessian data:
-hessian = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/optimization/rsh_optimization_0.190_0.460_{gamma:.3f}/jobex/aoforce"
-# directory containing excited state electronic gradient:
-egrad = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calculations/ttm-1cz_1/cam-b3lyp/svp/excited_state_1/rsh_state_1_egrad_0.190_0.460_{gamma:.3f}/ridft/egrad"
-hessian, egrad = os.path.abspath(hessian), os.path.abspath(egrad)
 
 # function for constructing B matrix (Jacobian):
 def get_Bmatrix(mol):
 
-    # set the default graph for the construction of the internal coordinates:
-    mol.set_default_graph()
-    # setup a list of internal coordinates:
-    ics = setup_ics_bonds(mol.graph)
-    """
+    # get all internal coordinates (using geometric package)
+    ic_all = PrimitiveInternalCoordinates(mol)
+
+    # screen for pure bond stretches:
+    bond_pairs = []
+    for internal in ic_all.Internals:
+        if isinstance(internal,Distance):
+            bond_pairs.append((internal.a,internal.b))
+
+    # set up internals with bond stretches only:
+    ic_bond = PrimitiveInternalCoordinates(mol)
+    # ... overwrite ...
+    ic_bond.Internals = [Distance(a,b) for a, b in bond_pairs]
+    
+    
+    x = np.array(mol[0].xyzs).flatten()
+
     print("\n Internal coordinates:")
-    for idx,ic in zip(range(len(ics)),ics):
-        print(f"{idx:6} ",ic)
-    """
+    for idx,(a,b) in enumerate(bond_pairs):
+        print(f"{idx:6}   {a}   {b}")
+
     # compute the Bmatrix for molecule 1; has dimension [natoms,ninternals]:
-    Bmat = compute_jacobian(ics,mol.coordinates)
+    Bmat = ic_bond.wilsonB(x).T
 
     return Bmat
 
@@ -47,7 +52,7 @@ def get_norm(vector):
 def get_Lmat(hessian):
     """
     returns the transformation matrix L with corrected phase factors
-    takes a Molecule object (mol using molmod) and the Turbomole directory with Hessian information (hessian)
+    takes the Turbomole directory with Hessian information (hessian)
     """
 
     # parse Hessian data:
@@ -55,7 +60,11 @@ def get_Lmat(hessian):
     coord,symbol,_ = moldata.get_coords()
     mass = moldata.get_masses()
     numb = moldata.get_numbers()
-    mol = Molecule(numb,coordinates=np.array(coord),symbols=symbol,masses=mass)
+
+    # init geomeTRIC object:
+    mol = Molecule()
+    mol.elem = [s.capitalize() for s in symbol]
+    mol.xyzs = [np.array(coord)*0.529177249]
     
     masses = moldata.get_masses()
     freqs,Lmat,redmass = moldata.get_hessian()
@@ -96,8 +105,8 @@ def get_Lmat(hessian):
             signs.append(0.)
     
     for idx in range(len(signs)):
-        #print(f"{idx:>5.0f}   {signs[idx]:>5.0f}   {freqs[idx]:>5.0f}")
-        pass
+        print(f"{idx:>5.0f}   {signs[idx]:>5.0f}   {freqs[idx]:>5.0f}")
+        #pass
 
     Lmat_new = np.zeros(np.shape(Lmat))
     for cidx in range(np.shape(Lmat)[1]):

@@ -77,7 +77,16 @@ class turbomole_results:
                 data = coord_file.readlines()
                 coords = []
                 symbols = []
+                in_coord = False
                 for line in data:
+                    if not in_coord:
+                        if line.startswith("$coord"):
+                            in_coord = True
+                            continue
+                    if in_coord:
+                        if line.startswith("$"):
+                            in_coord = False
+                            break
                     match = re.search(r"^\s*([-+]?\d*\.\d+|\d+\.\d*[eEdD][-+]?\d+)\s*([-+]?\d*\.\d+|\d+\.\d*[eEdD][-+]?\d+)\s*([-+]?\d*\.\d+|\d+\.\d*[eEdD][-+]?\d+)\s\s*(\w\w?)",line)
                     if match is None:
                         continue
