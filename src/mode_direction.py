@@ -30,8 +30,8 @@ def get_Bmatrix(mol):
     # set up internals with bond stretches only:
     ic_bond = PrimitiveInternalCoordinates(mol)
     # ... overwrite ...
-    ic_bond.internals = [Distance(a,b) for a, b in bond_pairs]
-    ic_bond.Internals = ic_bond.internals
+    ic_bond.Internals = [Distance(a,b) for a, b in bond_pairs]
+    
     
     x = np.array(mol[0].xyzs).flatten()
 
