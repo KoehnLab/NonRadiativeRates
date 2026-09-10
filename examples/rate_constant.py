@@ -5,13 +5,7 @@ import numpy as np
 
 from nonradiative_rates import read_turbomole as rtm
 from nonradiative_rates.fcwd import run_simulation
-
-au2rcm = 219474.63068  # cm-1 / E_h
-amu = 1./5.485799090441e-4 # me
-hbar = 1.054571817e-34
-a0 = 5.29177210544e-11
-cc = 299792458
-hh = 6.62607015e-34
+from nonradiative_rates.constants import au2rcm, amu, hbar, cc, hh
 
 # Specify directories:
 gamma = 0.211
@@ -36,7 +30,7 @@ def non_radiative(nac, fcwd):
 
 
 def main():
-    val_avg, vala_avg, osci_list, mode_fcf_list, mode_fcf_a_list = run_simulation(
+    result = run_simulation(
         hessian_calculation=hessian_dir,
         egrad_calculation=egrad_dir,
         fcwd_file="FCWD.dat",
@@ -70,14 +64,14 @@ def main():
     print(f"\nNAC: {nac:.2f} rcm")
 
     # Computes non-radiative rate:
-    knr = non_radiative(nac, val_avg)
-    knr_a = non_radiative(nac, vala_avg)
+    knr = non_radiative(nac, result.val_avg)
+    knr_a = non_radiative(nac, result.vala_avg)
     print(f"\nNon-radiative rates:\n{knr:.3e} (H)   {knr_a:.3e} (A)\n")
 
     # Writes output to file:
     with open(f"TTM-1Cz_{gamma}.dat", "w") as _f:
         _f.write(f"{'FREQ':>20} {'HR':>20} {'NAC':>20}\n")
-        for osci,nac in zip(osci_list, nacv_pf[7:]):
+        for osci,nac in zip(result.osci_list, nacv_pf[7:]):
             _f.write(f"{osci[0]:>20.2f} {osci[1]:>20.4e} {nac:>20.2f}\n")
 
 

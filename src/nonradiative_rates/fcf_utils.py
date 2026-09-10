@@ -2,9 +2,7 @@ import numpy as np
 import scipy.special as scsp
 
 from . import _fastfold as fastfold
-
-# Boltzmann constant in cm^-1/K
-kBcm = 0.695034800381
+from .constants import kBcm
 
 class FcfMorse0:
     """

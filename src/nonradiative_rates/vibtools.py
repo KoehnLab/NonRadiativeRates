@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 from . import read_turbomole as rtm
+from .constants import amu, a0, au2rcm
 
 
 # =====================================================
@@ -60,10 +61,6 @@ def displace_geometry_along_mode(
     Returns:
         symbols, displaced_coords (Å), matched_freq
     """
-    amu = 1./5.485799090441e-4 # me
-    a0 = 5.29177210544e-11
-    au2rcm = 219474.63068  # cm-1 / E_h
-    
     symbols, coords = read_xyz(xyz_path)
     n_atoms = len(symbols)
 

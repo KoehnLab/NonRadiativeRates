@@ -7,10 +7,6 @@ from numpy.testing import assert_almost_equal, assert_array_almost_equal, assert
 
 from nonradiative_rates import read_turbomole as readTM
 
-Eh2rcm = 219474.63068 # cm-1 / Eh
-amu = 1./5.485799090441e-4 # me
-a02AA = .529177249 # AA / a0
-
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "examples", "testmolecule")
 
 class TestReadTM(unittest.TestCase):

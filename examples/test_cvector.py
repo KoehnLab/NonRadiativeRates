@@ -2,9 +2,7 @@
 
 import numpy as np
 from nonradiative_rates import read_turbomole as rtm
-
-au2rcm = 219474.63068  # cm-1 / E_h
-amu = 1./5.485799090441e-4 # me
+from nonradiative_rates.constants import au2rcm, amu
 
 mdata = rtm.turbomole_results("testmolecule2")
 

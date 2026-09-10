@@ -6,11 +6,14 @@ from nonradiative_rates.fcwd import run_simulation
 
 def main():
     # run with the defaults, against the bundled example data:
-    run_simulation(
+    result = run_simulation(
         hessian_calculation="testmolecule",
         egrad_calculation="testmolecule",
         fcwd_file="fcwd.dat",
     )
+
+    print(f"\nharmonic FCWD average:   {result.val_avg:.4e}")
+    print(f"anharmonic FCWD average: {result.vala_avg:.4e}")
 
     # example of overriding a few parameters, e.g. to treat low-frequency
     # modes classically and use a tighter anharmonicity threshold:

@@ -4,10 +4,7 @@ import numpy as np
 import scipy.special as scsp
 
 from nonradiative_rates import fcf_utils as FcfUtils
-
-Eh2rcm = 219474.63068 # cm-1 / Eh
-amu = 1./5.485799090441e-4 # me
-a02AA = .529177249 # AA / a0
+from nonradiative_rates.constants import au2rcm, amu, a02AA
 
 # use these values:
 omega = 3000
@@ -16,8 +13,8 @@ D = omega/(4*xi)
 mred = 10
 mredau = mred*amu
 
-Dau = D/Eh2rcm
-omau = omega/Eh2rcm
+Dau = D/au2rcm
+omau = omega/au2rcm
 
 aau = np.sqrt(2.*omau*xi*mredau)
 
