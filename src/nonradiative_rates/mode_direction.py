@@ -3,8 +3,8 @@
 import numpy as np
 from geometric.molecule import Molecule
 from geometric.internal import PrimitiveInternalCoordinates, Distance
-import read_turbomole as rtm
-import os
+
+from . import read_turbomole as rtm
 
 # define constants for conversion:
 au2rcm = 219474.63068  # cm-1 / E_h

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import read_turbomole as rtm
+from nonradiative_rates import read_turbomole as rtm
 
 au2rcm = 219474.63068  # cm-1 / E_h
 amu = 1./5.485799090441e-4 # me

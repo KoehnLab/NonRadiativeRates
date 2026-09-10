@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61", "Cython>=3.0", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nonradiative-rates"
+version = "0.1.0"
+description = "Tools to compute the bits and pieces needed for non-radiative rates"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "geometric",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

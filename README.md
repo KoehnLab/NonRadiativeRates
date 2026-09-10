@@ -2,23 +2,29 @@
 Collection of python code to compute the bits and pieces needed for non-radiative rates
 
 # Setup
-Add `<where_ever_it_is>/NonRadiativeRates/src` to your `$PYTHONPATH`
+
+This requires a C compiler (to build the `_fastfold` Cython extension). Install the package,
+in editable mode, from the repository root:
+```
+pip install -e .
+```
+
+For development (running the test suite):
+```
+pip install -e ".[dev]"
+```
+
+# Tests
+
+Run the test suite with:
+```
+pytest
+```
 
 # Cython
 
-run (inside `src`):
+The `_fastfold` extension is built automatically by `pip install -e .`. If you change
+`src/nonradiative_rates/_fastfold.pyx` and want to rebuild it in place without reinstalling:
 ```
 python setup.py build_ext --inplace
 ```
-(or `python3` if `python` points to a legacy python2 verion). This compiles the cython file `fastfolg.pyx`.
-
-For MAC (in a virtutal environment):
-```
-brew install pyenv pyenv-virtualenv
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-pyenv virtualenv 3.9.5 <name>
-pip install -r requirements.txt
-pip install --no-build-isolation molmod 
-```
-then compile the cython file as described above. 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import numpy as np
 import os
-import read_turbomole as rtm
+
+from . import read_turbomole as rtm
 
 
 # =====================================================
@@ -101,21 +102,4 @@ def displace_geometry_along_mode(
     displaced_coords = coords + Q_step * mode_vector
 
     return symbols, displaced_coords, matched_freq, Q_step
-
-
-# =====================================================
-#  Script interface
-# =====================================================
-if __name__ == "__main__":
-
-    hessian_dir = "/home/linux3_i1/toews/Documents/phd/quantum_sensors/calculations/pentacene_0/b3lyp/svp/optimization/jobex/aoforce"
-    xyz_path = "/home/linux3_i1/toews/Documents/phd/quantum_sensors/optimized/pentacene_0_b3lyp_svp_opt.xyz" 
-
-    symbols, displaced_coords, matched_freq, Q_step = displace_geometry_along_mode(
-        hessian_dir,
-        xyz_path,
-        target_freq=997.18,
-        Q_step=0.1,       # dimensionless displacement
-        tolerance=0.01     # allowed mismatch in cm^-1
-        )
 

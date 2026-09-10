@@ -2,7 +2,7 @@
 
 import numpy as np
 
-import FcfUtils
+from nonradiative_rates import fcf_utils as FcfUtils
 
 Eh2rcm = 219474.63068 # cm-1 / Eh
 amu = 1./5.485799090441e-4 # me

@@ -1,9 +1,7 @@
 import numpy as np
 import scipy.special as scsp
-import fastfold
 
-
-use_cython = True   # you have to compile fastfold
+from . import _fastfold as fastfold
 
 # Boltzmann constant in cm^-1/K
 kBcm = 0.695034800381
@@ -257,7 +255,7 @@ class FcfMorse0:
 
         return In0
 
-def get_b0n(self, nn, h=1e-6):
+    def get_b0n(self, nn, h=1e-6):
         """
         Get the b_j Franck–Condon related quantity for two equivalent Morse oscillators.
         Uses numerical derivative dI_n(A,B,C)/dB via four-point central finite differences.
@@ -332,12 +330,13 @@ def get_b0n(self, nn, h=1e-6):
     
 class FCWD:
 
-    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0):
+    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0,use_cython=True):
 
         self.mode_list = mode_list
         self.lam_class = lam_class
         self.T_sim = T_sim
         self.dbg = debug
+        self.use_cython = use_cython
 
 
     def init_Gauss(self,nbins,dnu,nu0,sigma):
@@ -457,7 +456,7 @@ class FCWD:
         # loop over modes
         for fcf_list in self.mode_list:
 
-            if use_cython:
+            if self.use_cython:
                 fcwd = fastfold.fold(fcwd,fcf_list,dnu)
 
             else:

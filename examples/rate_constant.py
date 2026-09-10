@@ -3,9 +3,9 @@
 import numpy as np
 import scipy.special as scsp
 
-import FcfUtils
-import read_turbomole as rtm
-from mode_direction import get_Lmat
+from nonradiative_rates import fcf_utils as FcfUtils
+from nonradiative_rates import read_turbomole as rtm
+from nonradiative_rates.mode_direction import get_Lmat
 
 au2rcm = 219474.63068  # cm-1 / E_h
 amu = 1./5.485799090441e-4 # me
