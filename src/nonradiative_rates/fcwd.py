@@ -3,6 +3,7 @@ import scipy.special as scsp
 
 from . import fcf_utils as FcfUtils
 from . import read_turbomole as rtm
+from .mode_direction import get_Lmat
 
 au2rcm = 219474.63068  # cm-1 / E_h
 amu = 1./5.485799090441e-4 # me
@@ -23,7 +24,8 @@ def run_simulation(
         maxquanta = 200,            # max. quanta (cutoff should lead to smaller value)
         max_e = 18000.,             # maximum energy for comp. FCWD (e_trans + several sigma)
         e_bin = 1.,                 # binning for FCWD
-        run_mode_tests = False      # see end of this routine
+        run_mode_tests = False,     # see end of this routine
+        mode_contrib_file = "FCWD_contr.dat",  # output file for run_mode_tests
         ):
 
 
@@ -41,6 +43,7 @@ def run_simulation(
     coord,elems,natoms = mol_data.get_coords()
     masses = mol_data.get_masses()
     freqs,Lmat,redmass = mol_data.get_hessian()
+    Lmat = get_Lmat(mol_data)
 
     if hessian_calculation == egrad_calculation:
         mol_data2 = mol_data
@@ -206,6 +209,7 @@ def run_simulation(
 
     with open(fcwd_file,"w") as outstr:
         ii = -1
+        print(f"{'FREQ':>10} {'FCWDh':>20} {'FCWDa':>20}",file=outstr)
         for val,vala in zip(fcwd,fcwd_a):
             ii = ii+1
             en = ii*1. + offset
@@ -214,30 +218,37 @@ def run_simulation(
     val_avg = np.sum(fcwd*fwin)
     vala_avg = np.sum(fcwd_a*fwin)
 
-    print(f"Averages: {val_avg} {vala_avg}",flush=True)
+    print(f"Averages: {val_avg} (H)  {vala_avg} (A)",flush=True)
 
     if run_mode_tests:
 
+        # exclude individual modes one at a time, to gauge their contribution to the FCWD;
+        # osci_list also holds the classically-treated modes, which are skipped when
+        # building mode_fcf_list, so mode_idx has to be offset by nclass to index back into it
         nmodes = len(mode_fcf_list)
-        for mode_idx in range(nmodes-1,-1,-1):
-            mode_fcf_list_sel = []
-            mode_fcf_a_list_sel = []
-            for idx in range(nmodes):
-                if idx == mode_idx:
-                    continue
-                mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
-                mode_fcf_list_sel.append(mode_fcf_list[idx])
+        nclass = len(osci_list) - len(mode_fcf_list)
+        with open(mode_contrib_file, "w") as outf:
+            print(f"{'FREQ':>16} {'FCWDh':>16} {'FCWDh rel':>16}  {'FCWDa':>16} {'FCWDa rel':>16}",file=outf)
+            for mode_idx in range(nmodes-1,-1,-1):
+                mode_fcf_list_sel = []
+                mode_fcf_a_list_sel = []
+                for idx in range(nmodes):
+                    if idx == mode_idx:
+                        continue
+                    mode_fcf_a_list_sel.append(mode_fcf_a_list[idx])
+                    mode_fcf_list_sel.append(mode_fcf_list[idx])
 
-            print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx][0]}")
-            fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel)
-            fcwd,_ = fcwd_gen.get_FCWD(max_e,e_bin)
+                print(f"Omitting idx = {mode_idx}  {osci_list[mode_idx+nclass][0]}")
+                fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=2)
+                fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
 
-            fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel)
-            fcwd_a,_ = fcwd_gen_a.get_FCWD(max_e,e_bin)
+                fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel,Ereo_class,debug=2)
+                fcwd_a,offset = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
-            val_avg_s = np.sum(fcwd*fwin)
-            vala_avg_s = np.sum(fcwd_a*fwin)
+                val_avg_s = np.sum(fcwd*fwin)
+                vala_avg_s = np.sum(fcwd_a*fwin)
 
-            print(f"Averages: {val_avg_s:16.5e} {val_avg/val_avg_s:10.6f}    {vala_avg_s:16.5e} {vala_avg/vala_avg_s:10.6f} ",flush=True)
+                print(f"{osci_list[mode_idx+nclass][0]:>16.2f} {val_avg_s:>16.5e} {val_avg/val_avg_s:>16.6f}  {vala_avg_s:>16.5e} {vala_avg/vala_avg_s:>16.6f} ",flush=True)
+                print(f"{osci_list[mode_idx+nclass][0]:>16.2f} {val_avg_s:>16.5e} {val_avg/val_avg_s:>16.6f}  {vala_avg_s:>16.5e} {vala_avg/vala_avg_s:>16.6f} ",file=outf)
 
-    return val_avg, vala_avg, osci_list
+    return val_avg, vala_avg, osci_list, mode_fcf_list, mode_fcf_a_list

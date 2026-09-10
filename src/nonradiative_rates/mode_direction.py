@@ -4,8 +4,6 @@ import numpy as np
 from geometric.molecule import Molecule
 from geometric.internal import PrimitiveInternalCoordinates, Distance
 
-from . import read_turbomole as rtm
-
 # define constants for conversion:
 au2rcm = 219474.63068  # cm-1 / E_h
 amu = 1./5.485799090441e-4 # me
@@ -49,14 +47,12 @@ def get_norm(vector):
     return np.sum(vector)
 
 # define a function to retrieve the phase factors:
-def get_Lmat(hessian):
+def get_Lmat(moldata):
     """
     returns the transformation matrix L with corrected phase factors
-    takes the Turbomole directory with Hessian information (hessian)
+    takes a parsed turbomole_results object with Hessian information
     """
 
-    # parse Hessian data:
-    moldata = rtm.turbomole_results(hessian)
     coord,symbol,_ = moldata.get_coords()
     mass = moldata.get_masses()
     numb = moldata.get_numbers()
@@ -113,5 +109,3 @@ def get_Lmat(hessian):
         Lmat_new[:,cidx] = signs[cidx] * Lmat[:, cidx]
         
     return Lmat_new
-
-#Lmat = get_Lmat(hessian)
