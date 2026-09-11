@@ -42,6 +42,21 @@ class TestFcfUtils(unittest.TestCase):
         assert_array_almost_equal(int2,int1,6,"Comparing Morse algorithms")
 
 
+    def test_fcf_dho(self):
+
+        S = 0.35
+
+        dho = FcfUtils.FcfDHO(S)
+
+        fcfs = [dho.get_I0n(ii) for ii in range(20)]
+
+        fcfs_ref = [np.exp(-S)*S**ii/scsp.gamma(ii+1) for ii in range(20)]
+        assert_array_almost_equal(fcfs,fcfs_ref,12,"Comparing DHO FCFs to the direct Poisson formula")
+
+        assert_almost_equal(fcfs[0],np.exp(-S))
+        assert_almost_equal(np.sum(fcfs),1.0,decimal=6)
+
+
     def test_FCWD_internal(self):
 
         modes = [[250.0,0.3],[400.0,0.1],[1100,0.25]]

@@ -324,8 +324,35 @@ class FcfMorse0:
 
         return bj
 
-    
-    
+
+class FcfDHO:
+    """
+    this class stores the info needed for computing the Franck-Condon factors of
+    two displaced harmonic oscillators (DHO), given the Huang-Rhys factor S
+
+    unlike FcfMorse0.get_I0n, which returns the <0|n> overlap amplitude (to be squared
+    by the caller), FcfDHO.get_I0n directly returns the Franck-Condon factor (probability)
+    for the 0-n transition, following the well-known Poisson-distribution form
+    """
+    def __init__(self,S,dbg=False):
+        self.S = S
+        self.dbg = dbg
+
+    def get_I0n(self,nn):
+        """
+        Get the Franck-Condon factor of the 0-n transition of two displaced harmonic
+        oscillators with Huang-Rhys factor S:
+            FCF(0,n) = exp(-S) * S^n / n!
+        """
+
+        if self.dbg:
+            print("calculating DHO FCF for n = ",nn)
+
+        fcf = np.exp(-self.S) * self.S**nn / scsp.gamma(nn+1)
+
+        return fcf
+
+
 class FCWD:
 
     def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0,use_cython=True):

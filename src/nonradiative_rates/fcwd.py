@@ -2,7 +2,6 @@ import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
-import scipy.special as scsp
 
 from . import fcf_utils as FcfUtils
 from . import read_turbomole as rtm
@@ -133,9 +132,11 @@ def _compute_mode_fcfs(osci_list, D, anh_thr, low_freq_approx, thrmod, maxquanta
         else:
             Ereo_quant += Ereo
 
+        dho = FcfUtils.FcfDHO(S)
+
         fcf_list = []
         for ii in range(maxquanta):
-            fcf = np.exp(-S)*S**ii/scsp.gamma(ii+1)
+            fcf = dho.get_I0n(ii)
             en = omg*(ii)
 
             fcf_list.append([fcf,en])
@@ -159,7 +160,7 @@ def _compute_mode_fcfs(osci_list, D, anh_thr, low_freq_approx, thrmod, maxquanta
         for ii in range(maxquanta):
             # for too small anharmonicity, the Morse integral code fails; use harminonic instead
             if omg <= anh_thr or xi < 7e-3:
-                fcf = np.exp(-S)*S**ii/scsp.gamma(ii+1)
+                fcf = dho.get_I0n(ii)
                 en = omg*(ii)
             else:
                 fcf = morse.get_I0n(ii)
