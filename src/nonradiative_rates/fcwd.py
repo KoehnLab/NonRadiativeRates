@@ -23,7 +23,7 @@ class FCWDResult:
     mode_fcf_a_list: list = field(repr=False)    # per-mode anharmonic FCF lists, quantum modes only
 
 
-def _read_oscillators(hessian_calculation, egrad_calculation, damp, damp_thr, verbose=True):
+def _read_oscillators(hessian_calculation, egrad_calculation, i_state_gradient, damp, damp_thr, verbose=True):
     """
     Reads the Hessian (with phase-corrected normal modes) and gradient from the given
     Turbomole calculations, and returns the list of oscillators [freq, S, dsp, redmass]
@@ -72,10 +72,17 @@ def _read_oscillators(hessian_calculation, egrad_calculation, damp, damp_thr, ve
         if freqs[ii] < damp_thr:
             freqs_sh[ii] += damp_au
 
+    # direction depends on whether the gradient refers to the initial or final state
+    if i_state_gradient:
+        dsp_sign = 1.0
+    else:
+        dsp_sign = -1.0
+
+
     # dsp = - grad/frq^2   (times √frq to get dimensionless coordinates)
     # for emission from state for which we have the gradient information,
     #  we actually have to reverse the sign, so + grad/freq^2 (no issue in harm. approx)
-    dsp = np.sqrt(freqs0_sh)*( grad.T @ Lmat ) / (freqs_sh)**2
+    dsp = dsp_sign * np.sqrt(freqs0_sh)*( grad.T @ Lmat ) / (freqs_sh)**2
 
     osci_list = []
     for ii in range(3*natoms):
@@ -195,10 +202,10 @@ def _bin_fcwd(mode_fcf_list, mode_fcf_a_list, Ereo_class, max_e, e_bin, e_trans,
     a Gaussian energy window centered at e_trans."""
     log = print if verbose else (lambda *a, **k: None)
 
-    fcwd_gen = FcfUtils.FCWD(mode_fcf_list,Ereo_class,debug=2)
+    fcwd_gen = FcfUtils.FCWD(mode_fcf_list,Ereo_class,debug=0)
     fcwd,offset = fcwd_gen.get_FCWD(max_e,e_bin)
 
-    fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list,Ereo_class,debug=2)
+    fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list,Ereo_class,debug=0)
     fcwd_a,offset = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
     nbins = len(fcwd_a)
@@ -251,10 +258,10 @@ def _mode_contribution_tests(osci_list, mode_fcf_list, mode_fcf_a_list, Ereo_cla
                 mode_fcf_list_sel.append(mode_fcf_list[idx])
 
             log(f"Omitting idx = {mode_idx}  {osci_list[mode_idx+nclass][0]}")
-            fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=2)
+            fcwd_gen = FcfUtils.FCWD(mode_fcf_list_sel,Ereo_class,debug=0)
             fcwd,_ = fcwd_gen.get_FCWD(max_e,e_bin)
 
-            fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel,Ereo_class,debug=2)
+            fcwd_gen_a = FcfUtils.FCWD(mode_fcf_a_list_sel,Ereo_class,debug=0)
             fcwd_a,_ = fcwd_gen_a.get_FCWD(max_e,e_bin)
 
             val_avg_s = np.sum(fcwd*fwin)
@@ -267,6 +274,7 @@ def _mode_contribution_tests(osci_list, mode_fcf_list, mode_fcf_a_list, Ereo_cla
 def run_simulation(
         hessian_calculation="testmolecule",
         egrad_calculation="testmolecule",
+        i_state_gradient = True,    # whether gradient refers to initial state (True) or final state (False)
         fcwd_file="fcwd.dat",       # output file for FCWD
         D = 30000,                  # diss. energy (for estimate of anharm.)
         anh_thr = 400.,             # use anh. approx for modes larger than this
@@ -293,6 +301,10 @@ def run_simulation(
     log("Settings:")
     log(f"read Hessian from:  {hessian_calculation}")
     log(f"read gradient from: {egrad_calculation}")
+    if i_state_gradient:
+       log("gradient refers to initial state")
+    else:
+       log("gradient refers to final state")
     log(f"FCWD written to:    {fcwd_file}")
     log(f"D = {D}     e_trans = {e_trans}  sigma = {sigma}")
     log(f"damp = {damp}  damp_thr = {damp_thr}  low_freq_approx = {low_freq_approx}")
@@ -300,7 +312,7 @@ def run_simulation(
     if low_freq_approx > 0:
         log(f"treating modes below {low_freq_approx} cm-1 classically")
 
-    osci_list = _read_oscillators(hessian_calculation, egrad_calculation, damp, damp_thr, verbose=verbose)
+    osci_list = _read_oscillators(hessian_calculation, egrad_calculation, i_state_gradient, damp, damp_thr, verbose=verbose)
 
     mode_fcf_list, mode_fcf_a_list, Ereo_class, Ereo_quant = _compute_mode_fcfs(
         osci_list, D, anh_thr, low_freq_approx, thrmod, maxquanta, max_e, verbose=verbose)
