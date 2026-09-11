@@ -5,7 +5,8 @@ import numpy as np
 
 from nonradiative_rates import read_turbomole as rtm
 from nonradiative_rates.fcwd import run_simulation
-from nonradiative_rates.constants import au2rcm, amu, hbar, cc, hh
+from nonradiative_rates.tools import non_radiative
+from nonradiative_rates.constants import au2rcm, amu
 
 # Specify directories:
 gamma = 0.211
@@ -16,17 +17,6 @@ nac_dir = f"/home/linux3_i1/toews/Documents/phd/organic_radical_emitters/calcula
 # Specify excitation and reorganization energy:
 vexc = 1.6615e+4
 reo = 1479.72
-
-
-def non_radiative(nac, fcwd):
-    """
-    Computes internal conversion rate constant from provided norm of the NAC vector (rcm) and the FCWD (1/rcm).
-    """
-    fcwd_si = fcwd / (100 * hh * cc)
-    nac_si = (nac * 100 * hh * cc)
-    knr = (np.pi/hbar) * nac_si**2 * fcwd_si
-
-    return knr
 
 
 def main():

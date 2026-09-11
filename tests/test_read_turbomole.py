@@ -7,7 +7,7 @@ from numpy.testing import assert_almost_equal, assert_array_almost_equal, assert
 
 from nonradiative_rates import read_turbomole as readTM
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "examples", "testmolecule")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "testmolecule")
 
 class TestReadTM(unittest.TestCase):
 

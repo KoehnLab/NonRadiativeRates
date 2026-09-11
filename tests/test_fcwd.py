@@ -7,7 +7,7 @@ from numpy.testing import assert_almost_equal
 
 from nonradiative_rates.fcwd import run_simulation
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "examples", "testmolecule")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "testmolecule")
 
 
 class TestFCWD(unittest.TestCase):
