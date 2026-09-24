@@ -1,12 +1,8 @@
 import numpy as np
 import scipy.special as scsp
-import fastfold
 
-
-use_cython = True   # you have to compile fastfold
-
-# Boltzmann constant in cm^-1/K
-kBcm = 0.695034800381
+from . import _fastfold as fastfold
+from .constants import kBcm
 
 class FcfMorse0:
     """
@@ -257,7 +253,7 @@ class FcfMorse0:
 
         return In0
 
-def get_b0n(self, nn, h=1e-6):
+    def get_b0n(self, nn, h=1e-6):
         """
         Get the b_j Franck–Condon related quantity for two equivalent Morse oscillators.
         Uses numerical derivative dI_n(A,B,C)/dB via four-point central finite differences.
@@ -328,16 +324,44 @@ def get_b0n(self, nn, h=1e-6):
 
         return bj
 
-    
-    
+
+class FcfDHO:
+    """
+    this class stores the info needed for computing the Franck-Condon factors of
+    two displaced harmonic oscillators (DHO), given the Huang-Rhys factor S
+
+    unlike FcfMorse0.get_I0n, which returns the <0|n> overlap amplitude (to be squared
+    by the caller), FcfDHO.get_I0n directly returns the Franck-Condon factor (probability)
+    for the 0-n transition, following the well-known Poisson-distribution form
+    """
+    def __init__(self,S,dbg=False):
+        self.S = S
+        self.dbg = dbg
+
+    def get_I0n(self,nn):
+        """
+        Get the Franck-Condon factor of the 0-n transition of two displaced harmonic
+        oscillators with Huang-Rhys factor S:
+            FCF(0,n) = exp(-S) * S^n / n!
+        """
+
+        if self.dbg:
+            print("calculating DHO FCF for n = ",nn)
+
+        fcf = np.exp(-self.S) * self.S**nn / scsp.gamma(nn+1)
+
+        return fcf
+
+
 class FCWD:
 
-    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0):
+    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0,use_cython=True):
 
         self.mode_list = mode_list
         self.lam_class = lam_class
         self.T_sim = T_sim
         self.dbg = debug
+        self.use_cython = use_cython
 
 
     def init_Gauss(self,nbins,dnu,nu0,sigma):
@@ -457,7 +481,7 @@ class FCWD:
         # loop over modes
         for fcf_list in self.mode_list:
 
-            if use_cython:
+            if self.use_cython:
                 fcwd = fastfold.fold(fcwd,fcf_list,dnu)
 
             else:
