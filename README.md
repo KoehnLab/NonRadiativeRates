@@ -1,5 +1,8 @@
 # NonRadiativeRates
-Collection of python code to compute the bits and pieces needed for non-radiative rates
+Collection of python code to compute the bits and pieces needed for non-radiative rates.
+
+Used, e.g., in R. Toews, A. Köhn, Phys. Chem. Chem. Phys. 2025, 28, 776. https://doi.org/10.1039/d5cp03613e
+  
 
 # Setup
 
