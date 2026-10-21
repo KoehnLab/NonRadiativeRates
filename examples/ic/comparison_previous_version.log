@@ -1,0 +1,109 @@
+COMPARISON OF THE IC EXAMPLE WITH ITS PREVIOUS VERSION
+=====================================================
+
+System: internal conversion D1 -> D0 of TTM-1Cz, relaxed-gradient model (CAM-B3LYP/def2-SVP), data in
+relaxed-gradient_model/ (D0 gradient and Hessian at the D1 geometry, derivative couplings at the D1
+geometry). Settings of the example (both versions): e_trans = 15924 cm-1, sigma = 100 cm-1,
+max_e = 25000 cm-1, e_bin = 1 cm-1, low_freq_approx = 300 cm-1 (30 modes classical, 126 quantum),
+Morse FCFs for modes > 400 cm-1 (D = 30000 cm-1).
+
+Previous version: examples/IC_rate_constant.py of the main branch (commit ecf3788), old module
+  (conda environment restruc: organic_radical_emitters/results/RESTRUCTURE/NonRadiativeRates),
+  direct folding in energy space, sensitivity analysis with run_mode_tests = True (the FCWD is
+  folded anew for each omitted mode), output FCWD_contr.dat.
+Current version: examples/ic/IC_rate_constant.py of the development branch, folding in Fourier space (fcwd_method = "fft"), FCWD analysis in a single call
+  (fcwd_analysis = True, _fastfold.fcwd_analysis_fft), output FCWD_contr.dat in the format of the
+  previous version (enhancement factors FCWD/FCWD(-k) in the columns "rel") and FCWD_analysis.dat
+  (remaining FCWD in % of the full FCWD, the inverse). The current version additionally runs the
+  pair analysis, the minimal mode set and the dominant final states (FCWD_analysis = True).
+
+
+1. RESULTS
+----------
+                              previous version      current version
+  NAC (cm-1)                  111.52                111.52
+  k_IC harmonic (1/s)         6.474e+03             6.474e+03
+  k_IC anharmonic (1/s)       1.042e+07             1.042e+07
+  FCWD (1/cm), direct vs. fft folding of the current module: harmonic rel. deviation
+  1.1e-08, anharmonic 4.2e-11 (FCWD: harmonic 8.797513e-13, anharmonic 1.416425e-09)
+
+Enhancement factors FCWD/FCWD(-k) (FCWD_contr.dat, previous vs. current version):
+  modes compared: 126
+  FCWDh(-k) : max rel deviation 2.2e-05 (median 0.0e+00); entries identical to printed digits: 121 of 126
+  FCWDh rel : max rel deviation 2.1e-05 (median 0.0e+00); entries identical to printed digits: 123 of 126
+  FCWDa(-k) : max rel deviation 0.0e+00 (median 0.0e+00); entries identical to printed digits: 126 of 126
+  FCWDa rel : max rel deviation 1.3e-08 (median 0.0e+00); entries identical to printed digits: 125 of 126
+  largest deviation (H): 1680.87 cm-1, FCWD(-k) old 2.28891e-15 new 2.28886e-15
+  top enhancement factors (H), old | new: 1681: 384.354 | 384.362, 1394: 2.764 | 2.764, 1381: 2.207 | 2.207, 1214: 1.668 | 1.668, 1010: 1.660 | 1.660
+  top enhancement factors (A), old | new: 1681: 308.290 | 308.290, 1394: 1.282 | 1.282, 1381: 1.209 | 1.209, 940: 1.133 | 1.133, 1010: 1.106 | 1.106
+
+The deviations of the harmonic values (<= 2.1e-05) occur only where omitting a mode reduces the FCWD
+by orders of magnitude (1681 cm-1: FCWD(-k) ~ 2.3e-15); they are the absolute round-off of the
+folding in Fourier space (~1e-19 for window averages). The anharmonic values agree to printed
+precision (1e-8).
+
+rates_new.dat (frequencies, Huang-Rhys factors, projected NACs): the previous version assigned the
+NACs with a fixed offset (nacv_pf[7:]); for TTM-1Cz (6 discarded modes, no imaginary mode) every NAC
+was attributed to the next higher mode and the last mode was missing (155 instead of 156 rows). The
+current version selects the NACs of the modes entering the FCWD by frequency (156 rows, correct
+assignment). The rate constants are not affected (they depend on the norm of the NAC vector only).
+
+
+2. COMPUTATIONAL TIME (wall time, same machine)
+------------------------------------------------
+Complete example scripts:
+  previous version, with run_mode_tests           42.39 s
+  previous version, without run_mode_tests          1.10 s
+  -> sensitivity analysis of the previous version   41.29 s
+  current version, FCWD_analysis = True            12.48 s   (incl. pair analysis, mode sets, dominant states)
+
+Steps of the current module:
+  run_simulation, direct folding                    0.54 s
+  run_simulation, Fourier space (fft)               0.42 s
+  single-mode analysis, direct (as before)         39.23 s
+  single-mode analysis, Fourier space              0.608 s   -> speed-up x64
+  pair analysis (all pairs, Fourier space)          4.04 s
+  minimal mode set (harmonic / anharmonic)          2.01 s / 2.26 s
+  dominant final states (harmonic / anharmonic)     1.10 s / 1.34 s
+
+The FCWD analysis of the previous version (single modes, 41.3 s) is reduced to 0.61 s (x64),
+i.e. FCWD and single-mode analysis together take ~1.0 s instead of 42.4 s. The remaining time of the
+current example is spent on the additional analyses (pairs, mode sets, dominant states).
+
+
+3. SUMMARY TABLES
+-----------------
+Results:
+
+  quantity                         previous version     current version
+  NAC (cm-1)                       111.52               111.52
+  k_IC harmonic (1/s)              6.474e+03            6.474e+03
+  k_IC anharmonic (1/s)            1.042e+07            1.042e+07
+
+Enhancement factors FCWD/FCWD(-k), current vs. previous version (126 modes):
+
+  FCF set       max. relative deviation    identical to printed digits
+  harmonic      <= 2e-5                    123 of 126
+  anharmonic    <= 1e-8                    125 of 126
+
+  Largest deviation: 1681 cm-1 (harmonic), 384.354 (previous) vs. 384.362 (current); omitting this
+  mode reduces the FCWD to ~2e-15, where the absolute round-off of the Fourier-space folding is
+  visible.
+
+Computational time (wall time):
+
+  step                                   previous version     current version
+  example without analysis               1.10 s               0.42 s (FCWD)
+  single-mode analysis                   41.3 s               0.61 s (x64)
+  FCWD + single-mode analysis            42.4 s               ~1.0 s
+  complete example, all analyses         -                    12.5 s
+
+  The 12.5 s of the current version include the analyses not available in the previous version:
+  pair analysis (4.0 s), minimal mode sets (4.3 s), dominant final states (2.4 s).
+
+NOTE (2026-10-21): the comparison above refers to the code of 2026-10-05. Afterwards, the Morse
+integrals were reworked (FcfMorse0.get_I0n evaluated in logarithms via FcfMorse0._integrals; all
+modes above anh_thr get Morse FCFs, no fallback to harmonic FCFs). This changes the anharmonic
+results of the example slightly: k_IC anharmonic 1.042e+07 -> 1.038e+07 1/s (-0.4 %), enhancement
+factor of the 1681 cm-1 mode (A) 308.290 -> 309.772; the harmonic results are unchanged.
+reference_output/ refers to the current code.

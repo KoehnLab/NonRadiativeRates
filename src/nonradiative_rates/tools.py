@@ -1,14 +1,7 @@
-import numpy as np
+"""Collection of tools to compute the bits and pieces needed for non-radiative rates.
 
-from .constants import hbar, cc, hh
+Kept for backward compatibility: the IC rate constant now lives in nonradiative_rates.ic.
+"""
+from .ic.rates import non_radiative
 
-
-def non_radiative(nac, fcwd):
-    """
-    Computes internal conversion rate constant from provided norm of the NAC vector (rcm) and the FCWD (1/rcm).
-    """
-    fcwd_si = fcwd / (100 * hh * cc)
-    nac_si = (nac * 100 * hh * cc)
-    knr = (np.pi/hbar) * nac_si**2 * fcwd_si
-
-    return knr
+__all__ = ["non_radiative"]

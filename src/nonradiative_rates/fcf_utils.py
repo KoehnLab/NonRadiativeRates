@@ -191,138 +191,114 @@ class FcfMorse0:
 
         return In0
 
-    def get_I0n(self,nn):
+    def _integrals(self,nn):
         """
-        Get the I(0,n) Franck-Condon integral of two Morse oscillators
-        Restricted to equivalent oscillators (but shifted)
-        The expression is as accurate as the underlying implementation of the Gamma and hypergeometric
-        functions in scipy are
-
-        Ff the number of levels becomes to large, it fails as it contains several calls 
-        to the Gamma function with values on the order of the max. quantum;
-        currently no modification to avoid this (use this function to try and get_I0n_ori to verify)
-
-        The expression is taken from:
-          Valiev, R. R. et al., Phys. Chem. Chem. Phys. 25, 6406–6415 (2023). 
+        <0|n> (get_I0n) and <0|x|n> (get_b0n, bohr) of the two equivalent, displaced Morse
+        oscillators, Eqs. 13, 15 and 16 of
+          Valiev, R. R. et al., Phys. Chem. Chem. Phys. 25, 6406-6415 (2023),
+        in a form that neither overflows nor cancels for small anharmonicities:
+        - all Gamma functions, normalization constants and Delta^(a0/2) are combined in logarithms;
+        - the terminating hypergeometric function is expanded in w = 1 - 1/A = (Delta-1)/(Delta+1)
+          (~ -alpha K/2, small) instead of 1/A (~ 1, cancellation of terms ~ 2^n). With a = 1 + B,
+          c = 1 + C, a - c = n - 1 + delta (delta = 0 for equivalent oscillators), the connection
+          formula 2F1(a,-n;c;z) = (c-a)_n/(c)_n 2F1(a,-n;a-c-n+1;1-z) reads
+              2F1(a,-n;c;1-w) = (-1)^n/(c)_n sum_j=0^n (delta+j)_(n-j) (a)_j (-n)_j/j! w^j;
+          at delta = 0 the j = 0 term vanishes (n >= 1) and (j)_(n-j) = (n-1)!/(j-1)!;
+        - dI_n/dB (Eq. 15) is the derivative of this expression with respect to delta (at fixed C),
+          analytic instead of finite differences:
+              d/da (delta+j)_(n-j) (a)_j = (delta+j)_(n-j) (a)_j [sum_m=j^(n-1) 1/m + psi(a+j) - psi(a)]
+          and (n-1)! (-1)^n/(c)_n from the j = 0 term.
+        Returns None for n beyond the last bound level.
         """
-
-        if self.dbg:
-            print("calculating integral for n = ",nn)
-
         if self.p0 != self.q0:
             print("This routine is explicitly only for equiv. Morse osc.")
             raise Exception("not defined")
 
-        # change to notation of that work for convenience
+        # notation of Valiev et al.
         an = 2.*(self.q0 - nn)
-        a0 = 2.*(self.p0)
+        a0 = 2.*self.p0
         alpha = self.alpha
-        Delta = np.exp(-alpha*self.dlt)
 
         # too high quantum number, return none
         if an <= 0:
-            return None        
-        
-        N0 = np.sqrt(alpha*a0/scsp.gamma(a0+1.))
-        Nn = np.sqrt(alpha*an*scsp.gamma(nn+1.)/scsp.gamma(an+nn+1))
+            return None
+
+        lnDelta = -alpha*self.dlt
+        A = 0.5*(np.exp(lnDelta) + 1.)
+        w = np.expm1(lnDelta)/(np.exp(lnDelta) + 1.)
+        a = 0.5*(a0 + an)            # 1 + B
+        c = an + 1.                  # 1 + C
+
+        # log of N0 Nn Delta^(a0/2) Gamma(1+B) Gamma(C+n+1)/(Gamma(n+1) Gamma(C+1)) A^(-1-B) / (c)_n,
+        # with (c)_n = Gamma(C+n+1)/Gamma(C+1)
+        lnP = (0.5*(np.log(alpha*a0) - scsp.gammaln(a0 + 1.))
+               + 0.5*(np.log(alpha*an) + scsp.gammaln(nn + 1.) - scsp.gammaln(an + nn + 1.))
+               + 0.5*a0*lnDelta + scsp.gammaln(a) - scsp.gammaln(nn + 1.) - a*np.log(A))
+        psia = scsp.digamma(a)
+        # K + ln(2 beta)/alpha - (psi(1+B) - ln A)/alpha, with beta = sqrt(2 mred D)/alpha
+        cb = self.dlt + (np.log(2.*self.a1) - psia + np.log(A))/alpha
+
+        if nn == 0:
+            P = np.exp(lnP)
+            return P/alpha, P/alpha*cb
+
+        # terms j = 1..n of the sum and of its derivative, in logarithms
+        jj = np.arange(1, nn + 1)
+        if w != 0.:
+            lnt = (scsp.gammaln(nn) - scsp.gammaln(jj)                                         # (n-1)!/(j-1)!
+                   + scsp.gammaln(nn + 1.) - scsp.gammaln(jj + 1.) - scsp.gammaln(nn - jj + 1.)  # |(-n)_j|/j!
+                   + scsp.gammaln(a + jj) - scsp.gammaln(a)                                     # (a)_j
+                   + jj*np.log(abs(w)))
+            sgn = (-1.)**nn*(-np.sign(w))**jj
+        else:
+            lnt = np.full(nn, -np.inf)
+            sgn = np.zeros(nn)
+        lnt0 = scsp.gammaln(nn)                                       # j = 0 term of the derivative
+        H = np.cumsum(1./np.arange(nn - 1, 0, -1))[::-1]              # sum_m=j^(n-1) 1/m, j = 1..n-1
+        H = np.append(H, 0.)
+        dpsi = np.cumsum(1./(a + np.arange(nn)))                      # psi(a+j) - psi(a), j = 1..n
+        m = max(lnt.max(), lnt0)
+        tj = sgn*np.exp(lnt - m)
+        F = tj.sum()
+        dF = np.sum(tj*(H + dpsi)) + (-1.)**nn*np.exp(lnt0 - m)
+
+        P = np.exp(lnP + m)
+        g = P*F/alpha
+        b = P/alpha*(cb*F - dF/alpha)
 
         if self.dbg:
-            print(f"N0, Nn, alpha, nn, a0, an: {N0}, {Nn}, {alpha}, {nn}, {a0}, {an}")
+            print(f"n = {nn}: I0n = {g}, b0n = {b}")
 
-        A = 0.5*Delta+0.5
-        B = 0.5*(a0+an)-1.
-        C = an
+        return g, b
 
-        #Inf1 = scsp.gamma(1.+B)*scsp.gamma(C+nn+1)/(scsp.gamma(nn+1)*scsp.gamma(C+1.))
-        # avoid overflow:
-        Inf1a = scsp.gamma(1.+B)/scsp.gamma(nn+1)
-        Inf1b = scsp.gamma(C+nn+1.)/scsp.gamma(C+1.)
-
-        if self.dbg:
-            print(f"Inf1a, Inf1b, B, C: {Inf1a} {Inf1b} {B} {C}")
-
-        Inf1 = Inf1a*Inf1b
-
-        Inf2 = A**(-1-B)
-        Inf3 = scsp.hyp2f1(1.+B,-nn,1.+C,1/A)
-
-        if self.dbg:
-            print(f"In0 = {N0}*{Nn}/{alpha}*{Delta**(0.5*a0)}*{Inf1}*{Inf2}*{Inf3}")
-
-        In0 = N0*Nn/alpha*Delta**(0.5*a0)*Inf1*Inf2*Inf3
-
-        return In0
-
-    def get_b0n(self, nn, h=1e-6):
+    def get_I0n(self,nn):
         """
-        Get the b_j Franck–Condon related quantity for two equivalent Morse oscillators.
-        Uses numerical derivative dI_n(A,B,C)/dB via four-point central finite differences.
+        Get the I(0,n) Franck-Condon integral <0|n> of two Morse oscillators
+        Restricted to equivalent oscillators (but shifted)
+
+        The expression is taken from:
+          Valiev, R. R. et al., Phys. Chem. Chem. Phys. 25, 6406-6415 (2023), Eqs. 13 and 16,
+        evaluated without overflow and cancellation for small anharmonicities, see _integrals();
+        get_I0n_ori evaluates Eq. 16 directly (overflows for anharmonicities below ~6e-3).
+        """
+        res = self._integrals(nn)
+        return None if res is None else res[0]
+
+    def get_b0n(self,nn):
+        """
+        Get the b_j Franck-Condon related quantity for two equivalent Morse oscillators,
 
         b_j = (K + ln(2 beta)/alpha) * g_j
               - (1/alpha^2) * N0 * Nn * Delta^(a0/2) * dI_n/dB
+
+        (Valiev et al., Phys. Chem. Chem. Phys. 25, 6406-6415 (2023), Eq. 15), with
+        beta = sqrt(2 mred D)/alpha and dI_n/dB evaluated analytically, see _integrals().
+        b_j = <0|x|n> in bohr, with x measured from the minimum of the oscillator in the
+        vibrational ground state; the dimensionless coordinate is q = sqrt(mred omega) x.
+        Same sign convention as get_I0n.
         """
-
-        if self.dbg:
-            print("calculating b_j for n = ", nn)
-
-        if self.p0 != self.q0:
-            print("This routine is explicitly only for equiv. Morse osc.")
-            raise Exception("not defined")
-
-        # --- notation consistent with get_I0n ---
-        an = 2. * (self.q0 - nn)
-        a0 = 2. * self.p0
-        alpha = self.alpha
-        Delta = np.exp(-alpha * self.dlt)
-
-        if an <= 0:
-            return None
-
-        # normalization constants
-        N0 = np.sqrt(alpha * a0 / scsp.gamma(a0 + 1.))
-        Nn = np.sqrt(alpha * an * scsp.gamma(nn + 1.) / scsp.gamma(an + nn + 1.))
-
-        # hypergeometric parameters
-        A = 0.5 * (Delta + 1.)
-        B = 0.5 * (a0 + an) - 1.
-        C = an
-
-        # --- compute g_j using existing routine ---
-        g_j = self.get_I0n(nn)
-
-        # --- numerical derivative dI_n/dB ---
-        def In_of_B(Bval):
-            Inf1a = scsp.gamma(1. + Bval) / scsp.gamma(nn + 1.)
-            Inf1b = scsp.gamma(C + nn + 1.) / scsp.gamma(C + 1.)
-            Inf1 = Inf1a * Inf1b
-
-            Inf2 = A ** (-1. - Bval)
-            Inf3 = scsp.hyp2f1(1. + Bval, -nn, 1. + C, 1. / A)
-
-            return Inf1 * Inf2 * Inf3
-
-        # --- four-point central difference ---
-        dIn_dB = (
-            -In_of_B(B + 2.0 * h)
-            + 8.0 * In_of_B(B + h)
-            - 8.0 * In_of_B(B - h)
-            + In_of_B(B - 2.0 * h)
-        ) / (12.0 * h)
-
-        # --- physical parameters ---
-        K = self.dlt                         # displacement
-        beta = (1. / alpha) * np.sqrt(2. * self.D1)
-
-        # --- assemble b_j ---
-        bj = ((K + np.log(2. * beta) / alpha) * g_j
-              - (1. / alpha**2)
-              * N0 * Nn * Delta**(0.5 * a0)
-              * dIn_dB)
-
-        if self.dbg:
-            print(f"b_j = {bj}")
-
-        return bj
+        res = self._integrals(nn)
+        return None if res is None else res[1]
 
 
 class FcfDHO:
@@ -353,9 +329,33 @@ class FcfDHO:
         return fcf
 
 
+def fold_fft_py(fcwd,mode_list,dnu,pad=2):
+    """pure Python/numpy version of _fastfold.fold_fft"""
+    nbins = len(fcwd)
+    nfft = 1
+    while nfft < pad*nbins:
+        nfft *= 2
+    spec = np.fft.rfft(np.asarray(fcwd,dtype=np.float64),nfft)
+    for fcf_list in mode_list:
+        stick = np.zeros((nfft))
+        for fcf in fcf_list:
+            mm = int(np.floor(fcf[1]/dnu))
+            if 0 <= mm < nbins:
+                stick[mm] += fcf[0]
+        spec *= np.fft.rfft(stick)
+    return np.fft.irfft(spec,nfft)[:nbins]
+
+
 class FCWD:
 
-    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0,use_cython=True):
+    def __init__(self,mode_list,lam_class=0.,T_sim=300.,debug=0,use_cython=True,method="direct"):
+        """
+        method: "direct" folds the modes one by one in energy space (default),
+                "fft" folds all modes at once in Fourier space (see _fastfold.fold_fft)
+        """
+        if method not in ("direct", "fft"):
+            raise ValueError(f"unknown FCWD method: {method}")
+        self.method = method
 
         self.mode_list = mode_list
         self.lam_class = lam_class
@@ -380,7 +380,7 @@ class FCWD:
     def get_FCWDori(self,nu_max,dnu):
         """
         compute the FCWD on a grid
-        the algorithm goes back to Stein and Rabinowicz (citation to be found)
+        the algorithm goes back to Stein and Rabinovitch (J. Chem. Phys. 58, 2438 (1973))
         and a suggestion by Robert Send (PhD thesis, Karlsruhe 2010)
         """
 
@@ -448,14 +448,11 @@ class FCWD:
 
         return fcwd,-nu_extra
     
-    def get_FCWD(self,nu_max,dnu):
+    def _initial_fcwd(self,nu_max,dnu):
         """
-        compute the FCWD on a grid
-        the algorithm goes back to Stein and Rabinowicz (citation to be found)
-        and a suggestion by Robert Send (PhD thesis, Karlsruhe 2010)
-        slightly improved version (still slow)
+        initial FCWD on the grid: Gaussian for the classically treated modes, or a
+        delta peak at zero; returns the FCWD and the extra range nu_extra below zero
         """
-
         # broadening by a classical distr.?
         if self.lam_class > 0.:
             sigma = np.sqrt(2.*self.lam_class*self.T_sim*kBcm)
@@ -477,6 +474,54 @@ class FCWD:
                 print(f"Sum over Gaussian: {test}   first value: {fcwd[0]} ")
         else:
             fcwd[0] = 1.
+
+        return fcwd,nu_extra
+
+    def get_mode_contributions(self,nu_max,dnu,window):
+        """
+        sensitivity analysis in a single call (Fourier space, see _fastfold.mode_contributions_fft):
+        returns sum(FCWD*window) of the full FCWD and an array with the same quantity for
+        the FCWD with each mode omitted in turn; window has to be given on the grid of get_FCWD()
+        """
+        fcwd,_ = self._initial_fcwd(nu_max,dnu)
+        return fastfold.mode_contributions_fft(fcwd,self.mode_list,window,dnu)
+
+    def get_minimal_mode_set(self,nu_max,dnu,window,fraction=0.9):
+        """
+        greedy search (Fourier space, see _fastfold.minimal_mode_set_fft) for a small set of
+        modes retaining at least fraction of sum(FCWD*window); returns sum(FCWD*window) of the
+        full FCWD, the omitted modes (in the order of omission), the values after each omission,
+        and the remaining modes (indices into mode_list)
+        """
+        fcwd,_ = self._initial_fcwd(nu_max,dnu)
+        return fastfold.minimal_mode_set_fft(fcwd,self.mode_list,window,dnu,fraction)
+
+    def get_dominant_states(self,nu_max,dnu,window,kbest=10,nstates=10):
+        """
+        dominant final vibrational states within the window (k-best fold in energy space, see
+        _fastfold.dominant_states); returns their contributions to sum(FCWD*window), their bins
+        and their quantum numbers (nstates x number of modes)
+        """
+        fcwd,_ = self._initial_fcwd(nu_max,dnu)
+        return fastfold.dominant_states(fcwd,self.mode_list,window,dnu,kbest,nstates)
+
+    def get_FCWD(self,nu_max,dnu):
+        """
+        compute the FCWD on a grid
+        the algorithm goes back to Stein and Rabinovitch (J. Chem. Phys. 58, 2438 (1973))
+        and a suggestion by Robert Send (PhD thesis, Karlsruhe 2010)
+        slightly improved version (still slow)
+        """
+
+        fcwd,nu_extra = self._initial_fcwd(nu_max,dnu)
+        nbins = len(fcwd)
+
+        if self.method == "fft":
+            if self.use_cython:
+                fcwd = fastfold.fold_fft(fcwd,self.mode_list,dnu)
+            else:
+                fcwd = fold_fft_py(fcwd,self.mode_list,dnu)
+            return fcwd,-nu_extra
 
         # loop over modes
         for fcf_list in self.mode_list:

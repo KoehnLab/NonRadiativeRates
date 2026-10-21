@@ -163,3 +163,14 @@ src/nonradiative_rates/_fastfold.c
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
+
+# Output written by running the examples in their directories
+# (reference output in reference_output/ is kept under version control)
+examples/**/FCWD*.dat
+examples/**/modes*.dat
+examples/**/mode_set_*.dat
+examples/**/dominant_states_*.dat
+examples/**/rates_new.dat
+!examples/**/reference_output/
+!examples/**/reference_output/**
+!examples/ic/comparison_previous_version.log

@@ -1,0 +1,254 @@
+EQUATIONS USED IN nonradiative_rates (branch ic-dev)
+====================================================
+
+Franck-Condon weighted density (FCWD), its computation in Fourier space, the analyses built on
+it, and the internal-conversion (IC) rate constant.
+
+Units: energies and frequencies in cm^-1 (rcm), hbar = 1 in the vibrational expressions, so that
+a phase factor reads exp(-i E t) with E in rcm and t in units of 1/rcm (times 2 pi c). Rate
+constants are converted to 1/s at the end (Sec. 5). Low-temperature limit for the quantum-treated
+modes: the initial state is the vibrational ground state |0_i> of the initial electronic state.
+References in square brackets refer to Sec. 6.
+
+
+1. MODEL AND NOTATION
+=====================
+
+  i, f           initial and final electronic state (IC example: D1 and D0 of TTM-1Cz)
+  k, l           normal-mode indices; M: number of vibrational modes
+  omega_k        harmonic frequency of mode k
+  q_k            dimensionless normal coordinate, q_k = sqrt(omega_k) L_k^T M_at^1/2 (x - x_0)
+                 (L_k: orthonormal eigenvector of the mass-weighted Hessian, M_at: atomic masses,
+                 x_0: reference geometry; in atomic units)
+  d_k            displacement of the final-state minimum relative to the initial geometry, in the
+                 dimensionless coordinates of the final state
+  S_k = d_k^2/2  Huang-Rhys factor [2]
+  v = (v_1, ..., v_M)  vibrational level of the final state, E_v = sum_k omega_k v_k (above the
+                 final zero-point energy, ZPE)
+  dE             energy at which the FCWD is evaluated (0-0 gap of the model)
+
+Relaxed-gradient model [1]: Hessian and gradient of the final state are computed at the initial
+geometry (minimum of the initial state). The final-state surface is harmonic around its
+extrapolated minimum,
+  d_k = -sqrt(omega_k) (g_mw . L_k) / omega_k^2      (g_mw: mass-weighted final-state gradient),
+which lies lambda = sum_k S_k omega_k below the final state at the initial geometry. With the
+electronic gap e_vert at the initial geometry, the FCWD is evaluated at dE = e_vert + lambda
+(fcwd.relaxed_gradient_gap). Modes with omega_k < 1e-3 rcm (translations, rotations, imaginary
+modes) do not enter the FCWD.
+
+
+2. FCWD
+=======
+
+  rho(dE) = sum_v |<v_f|0_i>|^2 delta(dE - E_v)        (golden-rule FCWD, e.g. [3, 10, 11])
+
+The delta function is replaced by a normalized Gaussian window of width sigma centered at dE;
+"FCWD" denotes the window average
+
+  rho = sum_E rho(E) w(E),      w(E) = exp(-(E - dE)^2/(2 sigma^2)) / (sigma sqrt(2 pi)) * e_bin
+
+on the energy grid E_m = offset + m e_bin, m = 0 ... nbins-1 (offset = 0 unless low-frequency
+modes are treated classically, see below).
+
+
+3. INDEPENDENT DISPLACED OSCILLATORS
+====================================
+
+For identical frequencies in both states and no mode mixing, the vibrational states factorize
+and the FCWD is the convolution of single-mode progressions:
+
+  |<v_f|0_i>|^2 = prod_k s_k,v_k^2,       s_v^2 = exp(-S) S^v / v!         (harmonic [2])
+
+(anharmonic: Morse FCFs, Sec. 3.1). Each mode contributes a list of lines (FCF, energy v omega_k),
+truncated when the FCFs drop below thrmod or the energy exceeds max_e. Lines are binned: line
+energy E -> bin floor(E/e_bin). The FCWD on the grid is the sequential convolution of the binned
+progressions ("direct" folding, _fastfold.fold; a binned count of states in the spirit of the
+Beyer-Swinehart/Stein-Rabinovitch algorithms [4, 5], with FCF-weighted instead of unit lines [1]):
+starting from the initial FCWD rho_0 (delta peak at bin 0, or a Gaussian of width
+sqrt(2 lambda_class kT) for classically treated modes), each mode is folded in, and contributions
+beyond the last bin are dropped. This is exact for all bins of the grid, since all line energies
+are >= 0.
+
+3.1 Morse FCFs
+--------------
+Modes above anh_thr are described by two identical Morse oscillators (dissociation energy D,
+anharmonicity xi = omega/(4 D)), displaced by K = d/sqrt(mred omega) [6, 7]. The overlaps
+s_v = <v|0> follow from Eqs. 13 and 16 of [7] (fcf_utils.FcfMorse0.get_I0n): with
+a_n = 2 beta - 2n - 1, beta = sqrt(2 mred D)/alpha, Delta = exp(-alpha K), A = (Delta + 1)/2,
+B = (a_n + a_0)/2 - 1, C = a_n,
+
+  g_n = <0|n> = N_0 N_n Delta^(a_0/2) I_n(A, B, C)/alpha,
+  I_n = Gamma(1+B) Gamma(C+n+1)/(Gamma(n+1) Gamma(C+1)) A^(-1-B) 2F1(1+B, -n; 1+C; 1/A).
+
+Evaluated directly, the Gamma functions (arguments ~ 1/xi) overflow for xi below ~6e-3
+(get_I0n_ori), and the polynomial 2F1(., -n; .; 1/A) with 1/A ~ 1 cancels (terms ~ 2^n, result
+~ (alpha K/2)^n). get_I0n combines all Gamma functions in logarithms and uses the connection
+formula [8] 2F1(a,-n;c;z) = (c-a)_n/(c)_n 2F1(a,-n;a-c-n+1;1-z): with a = 1+B, c = 1+C,
+a - c = n - 1 + delta (delta = 0 for identical oscillators) and w = 1 - 1/A = (Delta - 1)/(Delta + 1)
+~ -alpha K/2,
+
+  2F1(a, -n; c; 1-w) = (-1)^n/(c)_n sum_(j=0..n) (delta+j)_(n-j) (a)_j (-n)_j/j! w^j,
+
+whose terms do not cancel (j = 0 vanishes at delta = 0 for n >= 1; (j)_(n-j) = (n-1)!/(j-1)!).
+For xi -> 0, the FCFs approach the harmonic ones. The line energies are the Morse levels
+E_v = omega v - omega xi [(v + 1/2)^2 - 1/4].
+
+
+4. COMPUTATION IN FOURIER SPACE
+===============================
+
+4.1 Discrete Fourier transform
+(fast Fourier transform [9]; the time-domain view corresponds to the correlation-function
+formulations of rates [10, 11])
+------------------------------
+Let N (nfft) be a power of two >= 2 nbins (zero padding), and
+
+  t_j = 2 pi j / (N e_bin),   j = 0 ... N/2           (rfft grid, N/2 + 1 points)
+
+The transform of a binned progression h (h_m: FCF in bin m) is
+
+  H(t_j) = sum_m h_m exp(-2 pi i m j / N) = sum_lines FCF exp(-i E_line t_j)  (E_line binned),
+
+i.e. the (discrete) generating function sum_v FCF_v exp(-i E_v t) of the mode. Convolution in
+energy is multiplication in Fourier space:
+
+  rho_m = IDFT[ R_0(t) prod_k H_k(t) ]_m,      R_0 = DFT of rho_0.
+
+- Wrap-around: the DFT convolution is circular. Lines of a single mode beyond the grid are dropped
+  (they cannot contribute to bins < nbins), so each H_k has support < nbins; with N >= 2 nbins,
+  contributions of combinations whose total energy exceeds N e_bin wrap around into low bins.
+  Their weight is negligible for the cases studied (checked against direct folding to 1e-15 for
+  FCWDs ~1e-6); it is not exactly zero in general.
+- Exact phase factors: H_k(t_j) is evaluated directly from the lines with a table of
+  exp(-2 pi i r/N), r = (m j) mod N (no sine/cosine calls, no FFT of mostly empty arrays), in blocks
+  of j (memory independent of the grid apart from the table).
+- Binning: line energies are rounded down to the grid, i.e. combinations of many lines are shifted
+  by up to (number of excited modes) x e_bin. Relative binning error of rho at e_bin = 1 rcm
+  (against an unbinned evaluation, test case with ~100 modes): ~1e-4; proportional
+  to e_bin.
+- Round-off: Fourier-space round-off is absolute (~1e-17 per bin for the normalized FCWD, ~1e-19
+  for window averages), whereas direct folding of positive numbers is accurate relative to each
+  value. Relative errors therefore grow for FCWDs far in the tail (observed: 1e-6 ... 1e-4 for
+  FCWDs ~1e-14 ... 1e-16).
+
+4.2 Window averages without inverse transform (Parseval)
+--------------------------------------------------------
+For real sequences a, b of length N (zero padded),
+
+  sum_m a_m b_m = (1/N) sum_(j=0)^(N-1) A_j conj(B_j)
+               = (1/N) [ A_0 B_0* + 2 Re sum_(j=1)^(N/2-1) A_j B_j* + A_(N/2) B_(N/2)* ]
+
+(one-sided weights c_j = 1, 2, ..., 2, 1 on the rfft grid). Hence
+
+  rho = (1/N) Re sum_j c_j R_0(t_j) conj(W(t_j)) prod_k H_k(t_j) = (1/N) Re sum_j base(t_j) prod_k H_k(t_j),
+
+with base = c R_0 conj(W) (W: DFT of the window). All Fourier-space quantities below are such
+inner products with base; no inverse transform is needed.
+
+4.3 Analyses (single call each)
+-------------------------------
+Mode-resolved analysis of the FCWD as introduced in [1] (omission of single modes, combination
+effects), here evaluated in a single pass in Fourier space.
+Prefix and suffix products pre_k = base H_0 ... H_(k-1), suf_k = H_(k+1) ... H_(M-1) give, without
+division by H_k (which may become small):
+
+  FCWD without mode k        rho(-k)  = (1/N) Re sum_j pre_k suf_k
+  FCWD without modes k < l   rho(-k,-l) = (1/N) Re sum_j pre_k H_(k+1) ... H_(l-1) suf_l
+                             (for fixed k, a running product is extended over l)
+
+"Omitting" a mode means treating it as undisplaced (H_k = 1). Output: remaining FCWD in % of the
+full FCWD, rho(-k)/rho and rho(-k,-l)/rho, and the synergy factor
+
+  Q_kl = rho rho(-k,-l) / (rho(-k) rho(-l))      (> 1: reinforcing, < 1: replacing modes).
+
+Minimal mode set: greedy backward elimination (a standard sequential selection scheme, cf. [13];
+omit the mode whose omission retains the largest
+FCWD, as long as >= fraction of rho is retained), each step one prefix/suffix pass over the
+remaining modes. Dominant final states: exact k-best fold in energy space with back pointers (dynamic programming
+keeping the k best partial states per bin, analogous to list Viterbi decoding [12]);
+an initial distribution rho_0 is folded into the window, w_eff(E) = sum_b rho_0(b) w(E + b).
+Round-off estimates: eps x (number of modes) x sum_j |term_j| / N.
+
+
+
+4.4 Benefits and limitations of the Fourier-space formulation
+--------------------------------------------------------------
+For the FCWD alone, folding in Fourier space is only slightly faster than direct folding (e.g.
+0.42 s vs. 0.54 s for the IC example). The main benefits arise from the structure: every quantity
+is a product of per-mode factors, evaluated as one inner product with the window (Sec. 4.2).
+
+1. Analyses in a single pass: omission of single modes and of pairs (Sec. 4.3) and the minimal
+   mode set are different products of the same mode transforms. Speed-ups: single-mode analysis
+   x30-60 (IC example x64), pair analyses feasible (all ~M^2/2 pairs in a few seconds).
+2. No inverse transform: window averages follow directly from Parseval's theorem. A change of the
+   window only changes the base factor, not the product of the modes, e.g. for energy scans rho(E)
+   without recomputing the mode transforms.
+3. Interchangeable factors: each factor of the product can be replaced independently, e.g. a
+   classical distribution of low-frequency modes by its (Gaussian) transform. Further extensions
+   would be multiplicative factors as well: finite temperature (thermal generating function per
+   mode, hot bands), line broadening (Lorentzian <-> exp(-gamma |t|)), or analytic generating
+   functions of groups of modes (e.g. with mode mixing), which are exact without truncation of
+   the FCF lists and without binning.
+4. Extension to time-correlation-function methods [10, 11]: finite temperature or (numerically
+   transformed) anharmonic factors fit into the same formalism.
+5. Memory: the block-wise evaluation with a table of exact phase factors keeps the memory demand
+   independent of the grid (apart from the table).
+
+Limitations:
+- Round-off is absolute (Sec. 4.1): the relative accuracy decreases far in the tail
+  (FCWD <~ 1e-15); there, direct folding of positive numbers remains more accurate, which is why
+  both methods are kept (fcwd_method = "direct" | "fft").
+- Wrap-around of the circular convolution requires zero padding (N >= 2 nbins).
+- Modes given as FCF lists remain binned (binning error ~1e-4 for rho at e_bin = 1 rcm,
+  proportional to e_bin).
+
+
+5. IC RATE CONSTANT
+===================
+
+  k_IC = pi/hbar |NAC|^2 rho                                                         [1]
+
+with the norm of the derivative-coupling (NAC) vector projected onto the normal modes of the
+final state (ic.effective_nac: mass weighting, projection, frequency weighting; modes below
+1 rcm do not contribute). With |NAC| in rcm and rho in 1/rcm: k [1/s] = (pi/hbar) (100 h c)
+|NAC|^2 rho, h, hbar, c in SI (ic.non_radiative).
+
+
+6. REFERENCES
+=============
+Scientific publications on the methods used in the implementation. Bibliographic data checked
+online (2026-10-06) except where noted; the original algorithms were not compared in detail with
+the implementation, so the attributions indicate the origin of the concepts.
+
+Model and rate expression
+ [1]  R. Toews, A. Koehn, "Dissecting non-radiative decay in donor-functionalized radicals with a
+      mode-resolved model", Phys. Chem. Chem. Phys. 2026, 28, 776-789, doi:10.1039/D5CP03613E
+      (relaxed-gradient model, IC rate, FCWD by folding of mode progressions, mode-resolved
+      analysis of accepting modes; code base of this package).
+ [2]  K. Huang, A. Rhys, Proc. R. Soc. Lond. A 1950, 204, 406, doi:10.1098/rspa.1950.0184
+      (Huang-Rhys factor, Poisson progression of displaced oscillators).
+ [3]  R. Englman, J. Jortner, Mol. Phys. 1970, 18, 145-164 (energy-gap law).
+
+FCWD (folding, anharmonic FCFs, Fourier space)
+ [4]  S. E. Stein, B. S. Rabinovitch, J. Chem. Phys. 1973, 58, 2438 (counting of states including
+      anharmonic oscillators; volume/page not verified online).
+ [5]  T. Beyer, D. F. Swinehart, Commun. ACM 1973, 16, 379 (Algorithm 448, direct count).
+ [6]  A. Matsumoto, K. Iwamoto, J. Quant. Spectrosc. Radiat. Transf. 1993, 50, 103-109 (Morse
+      FCFs; as cited in fcf_utils.py, not verified online).
+ [7]  R. R. Valiev, B. S. Merzlikin, R. T. Nasibullin, A. Kurtzevitch, V. N. Cherepanov,
+      R. R. Ramazanov, D. Sundholm, T. Kurten, Phys. Chem. Chem. Phys. 2023, 25, 6406-6415,
+      doi:10.1039/d2cp05275j (Morse overlaps, Eqs. 12-16).
+ [8]  NIST Digital Library of Mathematical Functions, Eq. 15.8.7, https://dlmf.nist.gov/15.8
+      (connection formula of terminating hypergeometric functions).
+ [9]  J. W. Cooley, J. W. Tukey, Math. Comput. 1965, 19, 297-301,
+      doi:10.1090/S0025-5718-1965-0178586-1 (FFT).
+ [10] Q. Peng, Y. Yi, Z. Shuai, J. Shao, J. Chem. Phys. 2007, 126, 114302 (radiationless decay
+      rates from a Gaussian correlation function, including Duschinsky rotation).
+ [11] Q. Peng, Y. Niu, C. Deng, Z. Shuai, Chem. Phys. 2010, 370, 215-222,
+      doi:10.1016/j.chemphys.2010.03.004 (vibration correlation function formalism).
+
+Analyses
+ [12] N. Seshadri, C.-E. W. Sundberg, IEEE Trans. Commun. 1994, 42, 313-323,
+      doi:10.1109/TCOMM.1994.577040 (list Viterbi decoding: k best paths by dynamic programming).
+ [13] I. Guyon, A. Elisseeff, J. Mach. Learn. Res. 2003, 3, 1157-1182 (sequential backward
+      selection, review).
