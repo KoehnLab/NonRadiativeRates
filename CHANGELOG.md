@@ -68,6 +68,12 @@ combination effects, and the IC rate.
 
 ### Added
 
+- References: the relaxed-gradient model is attributed to the preprint R. Toews, A. Koehn,
+  "Internal conversion in functionalized poly-chlorinated trityl radicals can be tuned by a
+  characteristic high-frequency mode", ChemRxiv, doi:10.26434/chemrxiv.15003675/v2 (new reference
+  [2] in `docs/FCWD_equations.txt`, the following references renumbered; README), not to the PCCP
+  paper (Toews & Koehn, PCCP 2026, 28, 776), which remains the reference for the FCWD by folding
+  and the mode-resolved analysis.
 - `nonradiative_rates.ic`: `non_radiative(nac, fcwd)` (moved from `tools`) and
   `effective_nac(nac_calculation, hessian_calculation)`, the projection of the derivative-coupling
   vector onto the normal modes (mass weighting, projection, frequency weighting), previously part

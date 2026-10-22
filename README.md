@@ -100,8 +100,10 @@ Both are used in `examples/ic/IC_rate_constant.py`.
 
 ## Relaxed-gradient model
 
-In the relaxed-gradient model, Hessian and gradient of the final state are computed at the
-initial-state geometry. The FCWD is then measured at `e_vert + lambda`, where `e_vert` is the
+In the relaxed-gradient model (introduced in R. Toews, A. Köhn, "Internal conversion in
+functionalized poly-chlorinated trityl radicals can be tuned by a characteristic high-frequency
+mode", ChemRxiv preprint, https://doi.org/10.26434/chemrxiv.15003675/v2), Hessian and gradient of
+the final state are computed at the initial-state geometry. The FCWD is then measured at `e_vert + lambda`, where `e_vert` is the
 electronic gap at that geometry and `lambda` the reorganization energy of the model, see
 `nonradiative_rates.fcwd.relaxed_gradient_gap`. Imaginary modes of the final-state Hessian
 are discarded (`nonradiative_rates.fcwd.imaginary_modes` lists them).
